@@ -1,10 +1,10 @@
 (() => {
 
-    function errorAssert(expresion: boolean, message: string) {
-        if(expresion === false) {
-            throw new Error(message);
-        }
-    }
+    // function errorAssert(expresion: boolean, message: string) {
+    //     if(expresion === false) {
+    //         throw new Error(message);
+    //     }
+    // }
     
     class Vector2 {
         x: number;
@@ -349,7 +349,7 @@
         drawMap3d(backbuffer);
         backbuffer.draw();
     }
-
+    
     const canvas = document.getElementById("canvas") as (HTMLCanvasElement | null);
     if (canvas === null) {
         throw new Error("cannot find canvas with id 'canvas'");
@@ -361,24 +361,76 @@
     canvas.height = SCREEN_HEIGHT;
     canvas.style.backgroundColor = "#444444";
 
-    const downSampleFactor = 1/2;
-    const backbuffer = new Backbuffer(canvas, canvas.width*downSampleFactor, canvas.height*downSampleFactor);
+    const downSampleFactor = 1/4;
+    const backbuffer = new Backbuffer(canvas, canvas.width*downSampleFactor, canvas.height);
+
+    type Keyboard = {
+        keyW: boolean,
+        keyS: boolean,
+        keyRight: boolean,
+        keyLeft: boolean,
+    };
+
+    const keyboard: Keyboard = {
+        keyW: false,
+        keyS: false,
+        keyRight: false,
+        keyLeft: false,
+    };
     
     window.addEventListener("keydown", (event) => {
         if(event.key === "w") {
-            playerPos = playerPos.add(playerDir.scale(playerSpeed));
+            keyboard.keyW = true;
         }
         if(event.key === "s") {
-            playerPos = playerPos.sub(playerDir.scale(playerSpeed));
+            keyboard.keyS = true;
         }
         if(event.key === "ArrowLeft") {
-            playerDir = playerDir.rotate(-10);
+            keyboard.keyLeft = true;
         }
         if(event.key == "ArrowRight") {
+            keyboard.keyRight = true;
+        }
+    });
+
+    window.addEventListener("keyup", (event) => {
+        if (event.key === "w") {
+            keyboard.keyW = false;
+        }
+        if (event.key === "s") {
+            keyboard.keyS = false;
+        }
+        if (event.key === "ArrowLeft") {
+            keyboard.keyLeft = false;
+        }
+        if (event.key == "ArrowRight") {
+            keyboard.keyRight = false;
+        }
+    });
+
+
+    const loop = () => {
+
+        // NOTE: Get keyboard input
+        if(keyboard.keyW === true) {
+            playerPos = playerPos.add(playerDir.scale(playerSpeed));
+        }
+        if (keyboard.keyS === true) {
+            playerPos = playerPos.sub(playerDir.scale(playerSpeed));
+        }
+        if (keyboard.keyLeft === true) {
+            playerDir = playerDir.rotate(-10);
+        }
+        if(keyboard.keyRight === true) {
             playerDir = playerDir.rotate(10);
         }
-        draw(backbuffer);
-    });
-    draw(backbuffer);
 
+        // NOTE: Update and Render the game
+        draw(backbuffer);
+
+        setTimeout(() => requestAnimationFrame(loop), 33);
+    };
+
+    loop();
+    
 })();
