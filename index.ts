@@ -1,5 +1,11 @@
 (() => {
 
+    function errorAssert(expresion: boolean, message: string) {
+        if(expresion === false) {
+            throw new Error(message);
+        }
+    }
+    
     class Vector2 {
         x: number;
         y: number;
@@ -50,51 +56,195 @@
         
     };
 
+    type Texture = {
+        pixels: Uint32Array,
+        width: number,
+        height: number,
+    }
+    
     const GRID_COLS: number = 10;
-    const GRID_ROWS: number = 8;
+    const GRID_ROWS: number = 10;
     const MAP: number[] = [
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-        2, 0, 0, 0, 0, 0, 0, 0, 0, 2,
-        2, 0, 0, 3, 3, 3, 4, 0, 0, 2,
-        2, 0, 0, 3, 0, 0, 4, 0, 0, 2,
-        2, 0, 0, 0, 0, 0, 4, 0, 0, 2,
-        2, 0, 0, 0, 0, 0, 4, 0, 0, 2,
-        2, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+        1, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        1, 0, 2, 0, 0, 0, 0, 0, 0, 1,
+        1, 0, 2, 0, 3, 0, 1, 0, 0, 1,
+        1, 0, 2, 0, 0, 0, 1, 0, 0, 1,
+        1, 0, 2, 0, 0, 0, 1, 0, 0, 1,
+        1, 0, 0, 0, 1, 1, 1, 0, 0, 1,
+        1, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        1, 0, 0, 0, 0, 0, 0, 0, 0, 1,
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1
     ];
-    const MAP_COLORS: string[] = [
-        "#000000",
-        "#ff0000",
-        "#00ff00",
-        "#0000ff",
-        "#ff00ff",
-        "#00ffff",
+
+    const MAP_COLORS: number[] = [
+        0xff000000,
+        0xffff0000,
+        0xff00ff00,
+        0xff0000ff,
+        0xffff00ff,
+        0xff00ffff,
     ];
-    
-    const SCREEN_WIDTH: number = 800;
-    const SCREEN_HEIGHT: number = 600;
-    const SCREEN_TILE_SIZE_X: number = SCREEN_WIDTH / GRID_COLS;
-    const SCREEN_TILE_SIZE_Y: number = SCREEN_HEIGHT / GRID_ROWS;
-    const SCREEN_PLAYER_SIZE: number = 10;
-    const RAY_SIZE = 6;
-    const RAY_AMOUNT = SCREEN_WIDTH / RAY_SIZE;
+        
+    const SCREEN_WIDTH: number = 1920/2
+    const SCREEN_HEIGHT: number = 1080/2
     
     let playerPos: Vector2 = new Vector2(GRID_COLS / 2 - 0.5, GRID_ROWS / 2 + 0.5);
     let playerDir: Vector2 = new Vector2(1, 0);
-    let playerFOV: number = 90;
+    let playerFOV: number = 80;
     const playerSpeed: number = 0.1;
+    const TEXTURES: Texture[] = [];
     
-    function worldToScreen(worldPos: Vector2): Vector2 {
-        return new Vector2(
-            worldPos.x * SCREEN_TILE_SIZE_X,
-            worldPos.y * SCREEN_TILE_SIZE_Y
-        );
-    }
+    class Backbuffer {
+        canvas: HTMLCanvasElement;
+        ctx: CanvasRenderingContext2D;
+        imageData: ImageData;
+        buffer: Uint32Array;
+        
+        width: number;
+        height: number;
+        widthScale: number;
+        heightScale: number;
+        
+        constructor(canvas: HTMLCanvasElement, width: number, height: number) {
+
+            this.canvas = canvas;
+            const ctx = canvas.getContext("2d", { willReadFrequently: true }) as (CanvasRenderingContext2D | null);
+            if (ctx === null) {
+                throw new Error("2d context is not supported");
+            }
+            this.ctx = ctx;
+            this.ctx.imageSmoothingEnabled = false;
+            
+            this.imageData = ctx.getImageData(0, 0, width, height);
+            this.buffer = new Uint32Array(this.imageData.data.buffer);
+            this.width = width;
+            this.height = height;
+
+            this.widthScale = canvas.width / width;
+            this.heightScale = canvas.height / height;
+
+            const saveCanvasWidth = canvas.width;
+            const saveCanvasHeight = canvas.height; 
+            
+            for(let index = 0; index < document.images.length; index++) {
+
+                const texture: HTMLImageElement = document.images[index];
+
+                canvas.width = texture.width;
+                canvas.height = texture.height;
+                this.ctx.drawImage(texture, 0, 0)
+
+                const textureData: ImageData = this.ctx.getImageData(0, 0, texture.width, texture.height);
+                const textureBuffer: ArrayBuffer = new ArrayBuffer(texture.width*texture.height*4);
+                const textureBuffer32: Uint32Array = new Uint32Array(textureBuffer);
+                textureBuffer32.set(new Uint32Array(textureData.data.buffer));
+
+                const result = {
+                    pixels: textureBuffer32,
+                    width: texture.width,
+                    height: texture.height
+                };                
+                TEXTURES.push(result);
+            }
+
+            canvas.width = saveCanvasWidth;
+            canvas.height = saveCanvasHeight;
+                
+        }
+    
+        draw() {
+            this.ctx.putImageData(this.imageData, 0, 0);
+            this.ctx.drawImage(this.canvas, 0, 0, this.canvas.width*this.widthScale, this.canvas.height*this.heightScale);
+        }
+        
+        clear(color: number) {
+            this.buffer.fill(color);
+        }
+        
+        drawRect(x: number, y: number, w: number, h: number, color: number) {
+            let minX = x;
+            let maxX = minX + (w-1);
+            let minY = y;
+            let maxY = minY + (h-1);
+
+            if(minX < 0) minX = 0;
+            if(maxX >= this.width) maxX = (this.width - 1);
+            if(minY < 0) minY = 0;
+            if(maxY >= this.height) maxY = (this.height - 1);
+
+            for(let offsetY: number = minY; offsetY <= maxY; ++offsetY) {
+                for(let offsetX: number = minX; offsetX <= maxX; ++offsetX) {
+                    this.buffer[offsetY*this.width+offsetX] = color;
+                }
+            }            
+        }
+
+        putTexture(texture: Texture) {
+            console.log(texture.width, texture.height);
+            
+            for(let y = 0; y < texture.height; ++y) {
+                for(let x = 0; x < texture.width; ++x) {
+                    this.buffer[y*this.width+x] = texture.pixels[y*texture.width+x];
+                }
+            }
+        }
+        
+        drawTexture(texture: Texture,
+                    srcX: number, srcY: number, srcW: number, srcH: number,
+                    desX: number, desY: number, desW: number, desH: number) {
+
+            let minX = desX;
+            let maxX = minX + (desW-1);
+            let minY = desY;
+            let maxY = minY + (desH-1);
+
+            let offsetX: number = 0;
+            let offsetY: number = 0;
+            
+            if(minX < 0) {
+                offsetX = -minX;
+                minX = 0;
+            }
+            if(maxX >= this.width) {
+                maxX = (this.width - 1);
+            }
+
+            if(minY < 0) {
+                offsetY = -minY;
+                minY = 0;
+            }
+            if(maxY >= this.height) {
+                maxY = (this.height - 1);
+            }
+
+//            console.log(desW, desH);
+            
+            for(let y = minY; y <= maxY; ++y) {
+
+                const ty = ((y - minY) + offsetY) / desH;
+                for(let x = minX; x <= maxX; ++x) {
+                    const tx = ((x - minX) + offsetX) / desW;
+
+                    const srcOffsetX = srcX + Math.floor(tx*srcW);
+                    const srcOffsetY = srcY + Math.floor(ty*srcH);
+                    const desOffsetX = x;
+                    const desOffsetY = y;
+
+                    const srcColor = texture.pixels[srcOffsetY*texture.width+srcOffsetX];
+                    
+                    this.buffer[desOffsetY*this.width+desOffsetX] = srcColor;
+                }
+            }
+        }
+        
+    };
 
     type Hit = {
         result: boolean,
         t: number,
-        color: string,
+        texture: Texture,
+        isVertical: boolean,
     };
 
     function calculateNearIntersection(pos: Vector2, dir: Vector2): Hit {
@@ -126,71 +276,42 @@
             stepY = 1;
         }
 
-        let maxSteps = 10;
+        let maxSteps = 20;
         while (maxSteps > 0) {
             maxSteps = maxSteps - 1;
 
             const tx: number = (edgeX - pos.x) / dx;
             const ty: number = (edgeY - pos.y) / dy;
-
-            let tIntersect = 0;
+            
+            let t = 0;
+            let isVertical = false;
+            
             if (tx < ty) {
                 edgeX += stepX;
                 mapX += stepX;
-                tIntersect = tx;
+                t = tx;                
             } else {
                 edgeY += stepY;
                 mapY += stepY;
-                tIntersect = ty;
+                t = ty;
+                isVertical = true;
             }
 
-            if (MAP[mapY * GRID_COLS + mapX] !== 0) {
-                return {
-                    result: true,
-                    t: tIntersect,
-                    color: MAP_COLORS[MAP[mapY * GRID_COLS + mapX]],
-                };
+            const mapIndex = MAP[mapY * GRID_COLS + mapX];
+            if (mapIndex !== 0) {
+                return { result: true, t, texture: TEXTURES[mapIndex-1], isVertical};
             }
         }
 
-        return { result: false, t: 0, color: "#000000" };
+        return { result: false, t: 0, texture: TEXTURES[0], isVertical: false};
     }
 
-    function drawLine(ctx: CanvasRenderingContext2D, p1: Vector2, p2: Vector2) {
-        ctx.beginPath();
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p2.x, p2.y);
-        ctx.stroke();
-    }
-
-    function drawCircle(ctx: CanvasRenderingContext2D, center: Vector2, radius: number) {
-        ctx.beginPath();
-        ctx.arc(center.x, center.y, radius, 0, 2 * Math.PI, false);
-        ctx.fill();
-    }
-
-    function drawMap(ctx: CanvasRenderingContext2D) {
-        const scale: number = 0.2;
-        const scaleTileX = SCREEN_TILE_SIZE_X*scale;
-        const scaleTileY = SCREEN_TILE_SIZE_Y*scale;
-        for (let y = 0; y < GRID_ROWS; ++y) {
-            for (let x = 0; x < GRID_COLS; ++x) {
-                if (MAP[y * GRID_COLS + x] !== 0) {
-                    ctx.fillStyle = "white";
-                } else {
-                    ctx.fillStyle = "#222222";
-                }
-                ctx.fillRect(x*scaleTileX, y*scaleTileY, scaleTileX, scaleTileY);
-            }
-        }
-    }
-
-    function drawMap3d(ctx: CanvasRenderingContext2D) {
+    function drawMap3d(backbuffer: Backbuffer) {
         const playerRight: Vector2 = playerDir.perp();
         
         const halfFovRad: number = (playerFOV / 2) * Math.PI / 180;
         const halfFovLen: number = Math.tan(halfFovRad) * playerDir.length();
-        const rayAmount = RAY_AMOUNT;
+        const rayAmount = backbuffer.width;
         for (let index = 0; index < rayAmount; ++index) {
             const t: number = (index / (rayAmount - 1)) * 2 - 1
             const rayDir: Vector2 = playerDir.add(playerDir.perp().scale(t * halfFovLen));
@@ -201,31 +322,37 @@
                 const hitPos = playerPos.add(hitDir);
                 const hitProjPos = playerPos.add(playerRight.scale(hitDir.dot(playerRight)));
                 const z = hitProjPos.sub(hitPos).length();
-          
-                const height = SCREEN_HEIGHT / z;
-                const width = RAY_SIZE;
-                const x = index * RAY_SIZE;
-                const y = (SCREEN_HEIGHT / 2) - (height / 2);
-                ctx.fillStyle = hit.color;
-                ctx.fillRect(x, y, width, height);
+
+                const height = Math.floor(backbuffer.height / z);
+                const y = Math.floor((backbuffer.height / 2) - (height / 2));
+
+                let samplePosX = 0;
+
+                if (hit.isVertical) {
+                    samplePosX = hitPos.x - Math.floor(hitPos.x);
+                } else {
+                    samplePosX = hitPos.y - Math.floor(hitPos.y);
+                }
+
+                const srcX = Math.floor(samplePosX * (hit.texture.width-1));
+                const srcY = 0;
+                const srcW = 1;
+                const srcH = hit.texture.height;
+                
+                backbuffer.drawTexture(hit.texture, srcX, srcY, srcW, srcH, index, y, 1, height);
             }
         }
     }
     
-    function draw(ctx: CanvasRenderingContext2D) {
-        ctx.reset();
-        drawMap3d(ctx);
-        drawMap(ctx);
+    function draw(backbuffer: Backbuffer) {
+        backbuffer.clear(0xff444444);
+        drawMap3d(backbuffer);
+        backbuffer.draw();
     }
 
     const canvas = document.getElementById("canvas") as (HTMLCanvasElement | null);
     if (canvas === null) {
         throw new Error("cannot find canvas with id 'canvas'");
-    }
-
-    const ctx = canvas.getContext("2d") as (CanvasRenderingContext2D | null);
-    if (ctx === null) {
-        throw new Error("2d context is not supported");
     }
 
     console.log("Welcome to my raycasting GAME!");
@@ -234,12 +361,9 @@
     canvas.height = SCREEN_HEIGHT;
     canvas.style.backgroundColor = "#444444";
 
-    canvas.addEventListener("mousemove", (event) => {
-        // const mousePos = new Vector2(event.offsetX, event.offsetY);
-        // playerDir = mousePos.sub(worldToScreen(playerPos)).norm();
-        // draw(ctx);
-    });
-
+    const downSampleFactor = 1/2;
+    const backbuffer = new Backbuffer(canvas, canvas.width*downSampleFactor, canvas.height*downSampleFactor);
+    
     window.addEventListener("keydown", (event) => {
         if(event.key === "w") {
             playerPos = playerPos.add(playerDir.scale(playerSpeed));
@@ -253,9 +377,8 @@
         if(event.key == "ArrowRight") {
             playerDir = playerDir.rotate(10);
         }
-        draw(ctx);
+        draw(backbuffer);
     });
-
-    draw(ctx);
+    draw(backbuffer);
 
 })();
