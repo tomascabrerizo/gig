@@ -192,7 +192,8 @@
         
         drawTexture(texture: Texture,
                     srcX: number, srcY: number, srcW: number, srcH: number,
-                    desX: number, desY: number, desW: number, desH: number) {
+                    desX: number, desY: number, desW: number, desH: number,
+                    vertical?: boolean) {
 
             let minX = desX;
             let maxX = minX + (desW-1);
@@ -218,9 +219,7 @@
                 maxY = (this.height - 1);
             }
 
-//            console.log(desW, desH);
-            
-            for(let y = minY; y <= maxY; ++y) {
+           for(let y = minY; y <= maxY; ++y) {
 
                 const ty = ((y - minY) + offsetY) / desH;
                 for(let x = minX; x <= maxX; ++x) {
@@ -231,9 +230,19 @@
                     const desOffsetX = x;
                     const desOffsetY = y;
 
-                    const srcColor = texture.pixels[srcOffsetY*texture.width+srcOffsetX];
+                    let srcColor = texture.pixels[srcOffsetY*texture.width+srcOffsetX];
+
+                    if(vertical === true) {
+                        const scale = 0.4;
+                        const r = ((srcColor >> 16) & 0xff) * scale;
+                        const g = ((srcColor >> 8) & 0xff) * scale;
+                        const b = ((srcColor >> 0) & 0xff) * scale;
+                        srcColor = (0xff << 24) | (r << 16) | (g << 8) | (b);
+                    }
                     
                     this.buffer[desOffsetY*this.width+desOffsetX] = srcColor;
+
+                    
                 }
             }
         }
@@ -339,7 +348,7 @@
                 const srcW = 1;
                 const srcH = hit.texture.height;
                 
-                backbuffer.drawTexture(hit.texture, srcX, srcY, srcW, srcH, index, y, 1, height);
+                backbuffer.drawTexture(hit.texture, srcX, srcY, srcW, srcH, index, y, 1, height, hit.isVertical);
             }
         }
     }
