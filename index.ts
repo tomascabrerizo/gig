@@ -53,6 +53,10 @@
         dot(other: Vector2): number {
             return this.x*other.x + this.y*other.y;
         }
+
+        static angleBetween(a: Vector2, b: Vector2) {
+            return Math.acos(a.dot(b)/(a.length()*b.length()));
+        }
         
     };
 
@@ -85,13 +89,17 @@
         0xffff00ff,
         0xff00ffff,
     ];
-        
+
+    const downSampleFactor = 1/4;
+
     const SCREEN_WIDTH: number = 1920/2
     const SCREEN_HEIGHT: number = 1080/2
     
     let playerPos: Vector2 = new Vector2(GRID_COLS / 2 - 0.5, GRID_ROWS / 2 + 0.5);
     let playerDir: Vector2 = new Vector2(1, 0);
-    let playerFOV: number = 80;
+    let cameraFOV: number = 90;
+    let cameraNear: number = 1; 
+    
     const playerSpeed: number = 0.1;
     const TEXTURES: Texture[] = [];
     
@@ -289,8 +297,15 @@
         while (maxSteps > 0) {
             maxSteps = maxSteps - 1;
 
-            const tx: number = (edgeX - pos.x) / dx;
-            const ty: number = (edgeY - pos.y) / dy;
+            let tx: number = 0;
+            if(dx !== 0) {
+                tx = (edgeX - pos.x) / dx;
+            
+            }
+            let ty: number = 0;
+            if(dy !== 0 ){
+                 ty = (edgeY - pos.y) / dy;
+            }
             
             let t = 0;
             let isVertical = false;
@@ -315,22 +330,77 @@
         return { result: false, t: 0, texture: TEXTURES[0], isVertical: false};
     }
 
+    function planeDir(): Vector2 {
+        const halfFovRad: number = (cameraFOV / 2) * Math.PI / 180;
+        const planeHalfLength: number = cameraNear*Math.tan(halfFovRad);
+        const planeDir = playerDir.perp().norm().scale(planeHalfLength);
+        return planeDir;
+    }
+    
+    function drawFloor(backbuffer: Backbuffer) {
+
+        const floorTexture: Texture = TEXTURES[4];
+        const cellingTexture: Texture = TEXTURES[4];
+
+        for(let y: number = Math.floor(backbuffer.height / 2) + 1; y < backbuffer.height; ++y) {
+
+            const plane = planeDir();
+            const rayLeft: Vector2 = playerDir.sub(plane);
+            const rayRight: Vector2 = playerDir.add(plane);
+            
+            const p: number = y - Math.floor(backbuffer.height / 2);
+            if(p === 0) continue;
+            
+            const posZ: number = backbuffer.height * 0.5;
+            const rowDistance: number = posZ / p;
+            
+            const floorStep: Vector2 = rayRight.sub(rayLeft).scale(rowDistance/backbuffer.width);
+            let floor: Vector2 = playerPos.add(rayLeft.scale(rowDistance));
+
+            for(let x: number = 0; x < backbuffer.width; ++x) {
+                const cellX: number = Math.floor(floor.x);
+                const cellY: number = Math.floor(floor.y);
+
+                floor = floor.add(floorStep);
+                
+                {
+                    const tx: number = Math.floor(floorTexture.width * (floor.x - cellX)) % floorTexture.width;
+                    const ty: number = Math.floor(floorTexture.height * (floor.y - cellY)) % floorTexture.height;
+
+                    const color = floorTexture.pixels[ty * floorTexture.width + tx];
+                    backbuffer.buffer[y * backbuffer.width + x] = color;
+                }
+                
+                {
+                    const tx: number = Math.floor(cellingTexture.width * (floor.x - cellX)) % cellingTexture.width;
+                    const ty: number = Math.floor(cellingTexture.height * (floor.y - cellY)) % cellingTexture.height;
+
+                    const ceilingY: number = (backbuffer.height - y - 1);
+                    const color = cellingTexture.pixels[ty * cellingTexture.width + tx];
+                    backbuffer.buffer[ceilingY*backbuffer.width+x] = color;
+                }
+
+            }
+            
+        }
+    }
+
     function drawMap3d(backbuffer: Backbuffer) {
-        const playerRight: Vector2 = playerDir.perp();
         
-        const halfFovRad: number = (playerFOV / 2) * Math.PI / 180;
-        const halfFovLen: number = Math.tan(halfFovRad) * playerDir.length();
         const rayAmount = backbuffer.width;
+        
         for (let index = 0; index < rayAmount; ++index) {
-            const t: number = (index / (rayAmount - 1)) * 2 - 1
-            const rayDir: Vector2 = playerDir.add(playerDir.perp().scale(t * halfFovLen));
+            const rayFactor: number = ((index / (rayAmount - 1)) * 2 - 1);
+            const rayDir: Vector2 = playerDir.add(planeDir().scale(rayFactor)).norm();
             const hit = calculateNearIntersection(playerPos, rayDir);
+            
             if (hit.result === true) {
 
-                const hitDir = rayDir.scale(hit.t);
-                const hitPos = playerPos.add(hitDir);
-                const hitProjPos = playerPos.add(playerRight.scale(hitDir.dot(playerRight)));
-                const z = hitProjPos.sub(hitPos).length();
+                const hitDir: Vector2 = rayDir.scale(hit.t);
+                const hitPos: Vector2 = playerPos.add(hitDir);
+                const distance: number = hitPos.sub(playerPos).length();
+                const B: number = Vector2.angleBetween(hitDir, playerDir);
+                const z: number = distance * Math.cos(B);
 
                 const height = Math.floor(backbuffer.height / z);
                 const y = Math.floor((backbuffer.height / 2) - (height / 2));
@@ -355,6 +425,7 @@
     
     function draw(backbuffer: Backbuffer) {
         backbuffer.clear(0xff444444);
+        drawFloor(backbuffer);
         drawMap3d(backbuffer);
         backbuffer.draw();
     }
@@ -370,9 +441,8 @@
     canvas.height = SCREEN_HEIGHT;
     canvas.style.backgroundColor = "#444444";
 
-    const downSampleFactor = 1/4;
     const backbuffer = new Backbuffer(canvas, canvas.width*downSampleFactor, canvas.height);
-
+    
     type Keyboard = {
         keyW: boolean,
         keyS: boolean,
@@ -416,8 +486,7 @@
             keyboard.keyRight = false;
         }
     });
-
-
+    
     const loop = () => {
 
         // NOTE: Get keyboard input
