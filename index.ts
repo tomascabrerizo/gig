@@ -107,7 +107,7 @@ let playerDir: Vector2 = new Vector2(1, 0);
 let cameraFOV: number = 90;
 let cameraNear: number = 1;
 
-const playerSpeed: number = 0.1;
+const playerSpeed: number = 0.06;
 const TEXTURES: Texture[] = [];
 
 class Backbuffer {
@@ -480,24 +480,38 @@ function draw(backbuffer: Backbuffer) {
     
     const loop = () => {
 
+        // TODO: Improve collision detection and resolution
+
+        let playerNewPos = playerPos;
+        
         // NOTE: Get keyboard input
         if(keyboard.keyW === true) {
-            playerPos = playerPos.add(playerDir.scale(playerSpeed));
+            playerNewPos = playerPos.add(playerDir.scale(playerSpeed));
         }
         if (keyboard.keyS === true) {
-            playerPos = playerPos.sub(playerDir.scale(playerSpeed));
+            playerNewPos = playerPos.sub(playerDir.scale(playerSpeed));
         }
         if (keyboard.keyLeft === true) {
-            playerDir = playerDir.rotate(-10);
+            playerDir = playerDir.rotate(-5);
         }
         if(keyboard.keyRight === true) {
-            playerDir = playerDir.rotate(10);
+            playerDir = playerDir.rotate(5);
+        }
+
+        const tileX = Math.floor(playerNewPos.x);
+        const tileY = Math.floor(playerNewPos.y);
+        
+        if(playerNewPos.x > 1 && playerNewPos.x < GRID_COLS-1 &&
+            playerNewPos.y > 1 && playerNewPos.y < GRID_ROWS-1) {
+            if(MAP[tileY][tileX] === 0) {
+                playerPos = playerNewPos;
+            }
         }
 
         // NOTE: Update and Render the game
         draw(backbuffer);
 
-        setTimeout(() => requestAnimationFrame(loop), 33);
+        setTimeout(() => requestAnimationFrame(loop), 16);
     };
 
     loop();
