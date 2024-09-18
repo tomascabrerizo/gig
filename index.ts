@@ -1,10 +1,4 @@
 
-// function errorAssert(expresion: boolean, message: string) {
-//     if(expresion === false) {
-//         throw new Error(message);
-//     }
-// }
-
 class Vector2 {
     x: number;
     y: number;
@@ -53,6 +47,10 @@ class Vector2 {
         return this.x * other.x + this.y * other.y;
     }
 
+    static lerp(a: Vector2, b: Vector2, t: number) {
+        return a.scale(1-t).add(b.scale(t));
+    }
+    
     static angleBetween(a: Vector2, b: Vector2) {
         return Math.acos(a.dot(b) / (a.length() * b.length()));
     }
@@ -65,20 +63,30 @@ type Texture = {
     height: number,
 }
 
-const GRID_COLS: number = 10;
-const GRID_ROWS: number = 10;
-const MAP: number[] = [
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-    1, 0, 2, 0, 0, 0, 0, 0, 0, 1,
-    1, 0, 2, 0, 3, 0, 1, 0, 0, 1,
-    1, 0, 2, 0, 0, 0, 1, 0, 0, 1,
-    1, 0, 2, 0, 0, 0, 1, 0, 0, 1,
-    1, 0, 0, 0, 1, 1, 1, 0, 0, 1,
-    1, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-    1, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+const MAP: Array<Array<number>> = [
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 2, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 2, 0, 3, 0, 1, 0, 0, 1],
+    [1, 0, 2, 0, 0, 0, 1, 0, 0, 1],
+    [1, 0, 2, 0, 0, 0, 1, 0, 0, 1],
+    [1, 0, 0, 0, 3, 3, 3, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 4, 0, 4, 0, 0, 0, 1],
+    [1, 0, 0, 4, 0, 0, 4, 0, 0, 1],
+    [1, 0, 0, 4, 0, 0, 4, 0, 0, 1],
+    [1, 0, 0, 4, 0, 0, 4, 0, 0, 1],
+    [1, 0, 0, 0, 4, 4, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 ];
+
+const GRID_ROWS: number = MAP.length;
+const GRID_COLS: number = MAP[0].length;
+
+console.log(GRID_COLS, GRID_ROWS);
 
 const MAP_COLORS: number[] = [
     0xff000000,
@@ -89,8 +97,7 @@ const MAP_COLORS: number[] = [
     0xff00ffff,
 ];
 
-
-const downSampleFactor = 1 / 4;
+const downSampleFactor = 1 / 2;
 
 const SCREEN_WIDTH: number = 1920 / 2
 const SCREEN_HEIGHT: number = 1080 / 2
@@ -321,7 +328,7 @@ function calculateNearIntersection(pos: Vector2, dir: Vector2): Hit {
             isVertical = true;
         }
 
-        const mapIndex = MAP[mapY * GRID_COLS + mapX];
+        const mapIndex = MAP[mapY][mapX];
         if (mapIndex !== 0) {
             return { result: true, t, texture: TEXTURES[mapIndex - 1], isVertical };
         }
@@ -338,50 +345,33 @@ function halfPlaneDir(): Vector2 {
 }
 
 function drawFloor(backbuffer: Backbuffer) {
+    const yStart: number = Math.floor(backbuffer.height/2+1);
+    const cameraPosY: number = Math.floor(backbuffer.height/2);
+
+    const p1: Vector2 = playerDir.sub(halfPlaneDir());
+    const p2: Vector2 = playerDir.add(halfPlaneDir());
 
     const floorTexture: Texture = TEXTURES[4];
-    const cellingTexture: Texture = TEXTURES[4];
+    
+    for(let y = yStart; y < backbuffer.height; ++y) {
+        const posY = cameraPosY - y;
+        const distance = Math.abs(cameraPosY / posY);
 
-    const halfPlane = halfPlaneDir();
-    const rayLeft: Vector2 = playerDir.sub(halfPlane);
-    const rayRight: Vector2 = playerDir.add(halfPlane);
+        for(let x = 0; x < backbuffer.width; ++x) {
+            const t = x / (backbuffer.width - 1);
+            const floor = playerPos.add(Vector2.lerp(p1, p2, t).scale(distance));
+            
+            const tx: number = Math.floor((floor.x - Math.floor(floor.x)) * floorTexture.width);
+            const ty: number = Math.floor((floor.y - Math.floor(floor.y)) * floorTexture.height);
 
-    for (let y: number = Math.floor(backbuffer.height / 2) + 1; y < backbuffer.height; ++y) {
+            const color: number = floorTexture.pixels[ty * floorTexture.width + tx];
+            backbuffer.buffer[y * backbuffer.width + x] = color;
 
-        const p: number = y - Math.floor(backbuffer.height / 2);
-        if (p === 0) continue;
-
-        const posZ: number = backbuffer.height * 0.5;
-        const rowDistance: number = posZ / p;
-
-        const floorStep: Vector2 = rayRight.sub(rayLeft).scale(rowDistance / backbuffer.width);
-        let floor: Vector2 = playerPos.add(rayLeft.scale(rowDistance));
-
-        for (let x: number = 0; x < backbuffer.width; ++x) {
-            const cellX: number = Math.floor(floor.x);
-            const cellY: number = Math.floor(floor.y);
-
-            floor = floor.add(floorStep);
-
-            {
-                const tx: number = Math.floor(floorTexture.width * (floor.x - cellX)) % floorTexture.width;
-                const ty: number = Math.floor(floorTexture.height * (floor.y - cellY)) % floorTexture.height;
-
-                const color = floorTexture.pixels[ty * floorTexture.width + tx];
-                backbuffer.buffer[y * backbuffer.width + x] = color;
-            }
-
-            {
-                const tx: number = Math.floor(cellingTexture.width * (floor.x - cellX)) % cellingTexture.width;
-                const ty: number = Math.floor(cellingTexture.height * (floor.y - cellY)) % cellingTexture.height;
-
-                const ceilingY: number = (backbuffer.height - y - 1);
-                const color = cellingTexture.pixels[ty * cellingTexture.width + tx];
-                backbuffer.buffer[ceilingY * backbuffer.width + x] = color;
-            }
+            const ceilingY: number = (backbuffer.height - y - 1);
+            backbuffer.buffer[ceilingY * backbuffer.width + x] = color;
 
         }
-
+        
     }
 }
 
@@ -441,7 +431,7 @@ function draw(backbuffer: Backbuffer) {
     canvas.height = SCREEN_HEIGHT;
     canvas.style.backgroundColor = "#444444";
 
-    const backbuffer = new Backbuffer(canvas, canvas.width*downSampleFactor, canvas.height);
+    const backbuffer = new Backbuffer(canvas, canvas.width*downSampleFactor, canvas.height*downSampleFactor);
     
     type Keyboard = {
         keyW: boolean,
