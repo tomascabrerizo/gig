@@ -102,7 +102,7 @@ const downSampleFactor = 1 / 4;
 const SCREEN_WIDTH: number = 1920 / 2
 const SCREEN_HEIGHT: number = 1080 / 2
 
-let playerPos: Vector2 = new Vector2(GRID_COLS / 2 - 0.5, GRID_ROWS / 2 + 0.5);
+let playerPos: Vector2 = new Vector2(GRID_COLS / 2 - 0.5 - 2, GRID_ROWS / 2 + 0.5 - 2);
 let playerDir: Vector2 = new Vector2(1, 0);
 let cameraFOV: number = 90;
 let cameraNear: number = 1;
@@ -269,7 +269,7 @@ class Backbuffer {
 type Hit = {
     result: boolean,
     t: number,
-    texture: Texture,
+    texture: (Texture|undefined),
     isVertical: boolean,
 };
 
@@ -385,7 +385,7 @@ function drawMap3d(backbuffer: Backbuffer) {
         const rayDir: Vector2 = playerDir.add(halfPlaneDir().scale(rayFactor)).norm();
         const hit = calculateNearIntersection(playerPos, rayDir);
 
-        if (hit.result === true) {
+        if (hit.result === true && hit.texture !== undefined) {
 
             const hitDir: Vector2 = rayDir.scale(hit.t);
             const hitPos: Vector2 = playerPos.add(hitDir);
@@ -401,7 +401,7 @@ function drawMap3d(backbuffer: Backbuffer) {
             } else {
                 samplePosX = hitPos.y - Math.floor(hitPos.y);
             }
-
+            
             const srcX = Math.floor(samplePosX * (hit.texture.width - 1));
             const srcY = 0;
             const srcW = 1;
@@ -501,11 +501,8 @@ function draw(backbuffer: Backbuffer) {
         const tileX = Math.floor(playerNewPos.x);
         const tileY = Math.floor(playerNewPos.y);
         
-        if(playerNewPos.x > 1 && playerNewPos.x < GRID_COLS-1 &&
-            playerNewPos.y > 1 && playerNewPos.y < GRID_ROWS-1) {
-            if(MAP[tileY][tileX] === 0) {
-                playerPos = playerNewPos;
-            }
+        if (MAP[tileY][tileX] === 0) {
+            playerPos = playerNewPos;
         }
 
         // NOTE: Update and Render the game
