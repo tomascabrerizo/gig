@@ -97,7 +97,7 @@ const MAP_COLORS: number[] = [
     0xff00ffff,
 ];
 
-const downSampleFactor = 1 / 2;
+const downSampleFactor = 1 / 4;
 
 const SCREEN_WIDTH: number = 1920 / 2
 const SCREEN_HEIGHT: number = 1080 / 2
@@ -166,6 +166,8 @@ class Backbuffer {
         canvas.width = saveCanvasWidth;
         canvas.height = saveCanvasHeight;
 
+        console.log(this.width, this.height);
+        
     }
 
     draw() {
@@ -367,9 +369,8 @@ function drawFloor(backbuffer: Backbuffer) {
             const color: number = floorTexture.pixels[ty * floorTexture.width + tx];
             backbuffer.buffer[y * backbuffer.width + x] = color;
 
-            const ceilingY: number = (backbuffer.height - y - 1);
-            backbuffer.buffer[ceilingY * backbuffer.width + x] = color;
-
+            // const ceilingY: number = (backbuffer.height - y - 1);
+            // backbuffer.buffer[ceilingY * backbuffer.width + x] = color;
         }
         
     }
@@ -412,7 +413,7 @@ function drawMap3d(backbuffer: Backbuffer) {
 }
 
 function draw(backbuffer: Backbuffer) {
-    backbuffer.clear(0xff444444);
+    backbuffer.clear(0xff774444);
     drawFloor(backbuffer);
     drawMap3d(backbuffer);
     backbuffer.draw();
