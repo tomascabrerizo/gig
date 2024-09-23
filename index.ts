@@ -80,21 +80,20 @@ const MAP: Array<Array<number>> = [
     [1, 0, 0, 0, 4, 4, 0, 0, 0, 1],
     [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
     [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 ];
 
 const GRID_ROWS: number = MAP.length;
 const GRID_COLS: number = MAP[0].length;
 
-console.log(GRID_COLS, GRID_ROWS);
-
-const MAP_COLORS: number[] = [
-    0xff000000,
-    0xffff0000,
-    0xff00ff00,
-    0xff0000ff,
-    0xffff00ff,
-    0xff00ffff,
+const MAP_COLORS: string[] = [
+    "#000000",
+    "#ff0000",
+    "#00ff00",
+    "#0000ff",
+    "#ff00ff",
+    "#00ffff"
 ];
 
 const downSampleFactor = 1 / 4;
@@ -102,7 +101,7 @@ const downSampleFactor = 1 / 4;
 const SCREEN_WIDTH: number = 1920 / 2
 const SCREEN_HEIGHT: number = 1080 / 2
 
-let playerPos: Vector2 = new Vector2(GRID_COLS / 2 - 0.5 - 2, GRID_ROWS / 2 + 0.5 - 2);
+let playerPos: Vector2 = new Vector2(GRID_COLS/2 - 3, GRID_ROWS/2 - 1);
 let playerDir: Vector2 = new Vector2(1, 0);
 let cameraFOV: number = 90;
 let cameraNear: number = 1;
@@ -118,9 +117,7 @@ class Backbuffer {
 
     width: number;
     height: number;
-    widthScale: number;
-    heightScale: number;
-
+ 
     constructor(canvas: HTMLCanvasElement, width: number, height: number) {
 
         this.canvas = canvas;
@@ -135,9 +132,6 @@ class Backbuffer {
         this.buffer = new Uint32Array(this.imageData.data.buffer);
         this.width = width;
         this.height = height;
-
-        this.widthScale = canvas.width / width;
-        this.heightScale = canvas.height / height;
 
         const saveCanvasWidth = canvas.width;
         const saveCanvasHeight = canvas.height;
@@ -165,14 +159,13 @@ class Backbuffer {
 
         canvas.width = saveCanvasWidth;
         canvas.height = saveCanvasHeight;
-
-        console.log(this.width, this.height);
         
     }
 
     draw() {
+        this.ctx.reset();
         this.ctx.putImageData(this.imageData, 0, 0);
-        this.ctx.drawImage(this.canvas, 0, 0, this.canvas.width * this.widthScale, this.canvas.height * this.heightScale);
+        this.ctx.drawImage(this.canvas, 0, 0, this.width, this.height, 0, 0, this.canvas.width, this.canvas.height);
     }
 
     clear(color: number) {
@@ -198,8 +191,6 @@ class Backbuffer {
     }
 
     putTexture(texture: Texture) {
-        console.log(texture.width, texture.height);
-
         for (let y = 0; y < texture.height; ++y) {
             for (let x = 0; x < texture.width; ++x) {
                 this.buffer[y * this.width + x] = texture.pixels[y * texture.width + x];
@@ -258,12 +249,9 @@ class Backbuffer {
                 }
 
                 this.buffer[desOffsetY * this.width + desOffsetX] = srcColor;
-
-
             }
         }
     }
-
 };
 
 type Hit = {
@@ -283,39 +271,46 @@ function calculateNearIntersection(pos: Vector2, dir: Vector2): Hit {
 
     let mapX = Math.floor(pos.x);
     let mapY = Math.floor(pos.y);
-
+    
     let edgeX: number;
     if (dx < 0) {
         edgeX = Math.floor(pos.x);
         stepX = -1;
-    } else {
+    } else if(dx > 0){
         edgeX = Math.ceil(pos.x);
+        if(pos.x === edgeX) edgeX += 1;
         stepX = 1;
+    } else {
+        edgeX = pos.x;
     }
+    
 
     let edgeY: number;
     if (dy < 0) {
         edgeY = Math.floor(pos.y);
         stepY = -1;
-    } else {
+    } else if (dy > 0) {
         edgeY = Math.ceil(pos.y);
+        if(pos.y === edgeY) edgeY += 1;
         stepY = 1;
+    } else {
+        edgeY = pos.y;
     }
-
+    
     let maxSteps = 20;
     while (maxSteps > 0) {
         maxSteps = maxSteps - 1;
 
-        let tx: number = 0;
+        let tx: number = Infinity;
         if (dx !== 0) {
             tx = (edgeX - pos.x) / dx;
 
         }
-        let ty: number = 0;
+        let ty: number = Infinity;
         if (dy !== 0) {
             ty = (edgeY - pos.y) / dy;
         }
-
+        
         let t = 0;
         let isVertical = false;
 
@@ -331,7 +326,7 @@ function calculateNearIntersection(pos: Vector2, dir: Vector2): Hit {
         }
 
         const mapIndex = MAP[mapY][mapX];
-        if (mapIndex !== 0) {
+        if (mapIndex !== undefined &&  mapIndex !== 0) {
             return { result: true, t, texture: TEXTURES[mapIndex - 1], isVertical };
         }
     }
@@ -369,10 +364,9 @@ function drawFloor(backbuffer: Backbuffer) {
             const color: number = floorTexture.pixels[ty * floorTexture.width + tx];
             backbuffer.buffer[y * backbuffer.width + x] = color;
 
-            // const ceilingY: number = (backbuffer.height - y - 1);
-            // backbuffer.buffer[ceilingY * backbuffer.width + x] = color;
-        }
-        
+            const ceilingY: number = (backbuffer.height - y - 1);
+            backbuffer.buffer[ceilingY * backbuffer.width + x] = color;
+        }        
     }
 }
 
@@ -412,11 +406,102 @@ function drawMap3d(backbuffer: Backbuffer) {
     }
 }
 
-function draw(backbuffer: Backbuffer) {
+function drawMiniMap(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
+    // Draw minimap
+
+    ctx.fillStyle = "black";
+    ctx.fillRect(x, y, w, h);
+    
+    let startX = x;
+    let startY = y;
+    let tileDim = 0;
+
+    if (GRID_COLS > GRID_ROWS) {
+        tileDim = w / GRID_COLS;
+        startY = h / 2 - GRID_ROWS * tileDim / 2;
+    } else {
+        tileDim = h / GRID_ROWS;
+        startX = w / 2 - GRID_COLS * tileDim / 2;
+    }
+
+    ctx.fillStyle = "white";
+    for (let y = 0; y < GRID_ROWS; ++y) {
+        for (let x = 0; x < GRID_COLS; ++x) {
+            ctx.fillRect(startX + x * tileDim, startY + y * tileDim, tileDim, tileDim);
+            const textureIndex = MAP[y][x] - 1;
+            if (textureIndex >= 0) {
+                const texture: HTMLImageElement = document.images[textureIndex];
+                ctx.drawImage(texture, startX + x * tileDim, startY + y * tileDim, tileDim, tileDim);
+            }
+
+        }
+    }
+
+    ctx.strokeStyle = "black"
+    for (let y = 0; y < GRID_ROWS; ++y) {
+        ctx.beginPath();
+        ctx.moveTo(startX, startY + y * tileDim);
+        ctx.lineTo(startX + GRID_COLS * tileDim, startY + y * tileDim);
+        ctx.stroke();
+    }
+
+    for (let x = 0; x < GRID_COLS; ++x) {
+        ctx.beginPath();
+        ctx.moveTo(startX + x * tileDim, startY);
+        ctx.lineTo(startX + x * tileDim, startY + GRID_ROWS * tileDim);
+        ctx.stroke();
+    }
+
+    const screenPlayerPos = new Vector2(startX, startY).add(playerPos.scale(tileDim));
+
+    // Draw rays
+    const rayAmount = 10;
+
+    for (let index = 0; index < rayAmount; ++index) {
+
+        const rayFactor: number = (index / rayAmount) * 2 - 1;
+        const rayDir: Vector2 = playerDir.add(halfPlaneDir().scale(rayFactor)).norm();
+        const hit = calculateNearIntersection(playerPos, rayDir);
+
+        if (hit.result === true) {
+            const hitDir: Vector2 = rayDir.scale(hit.t);
+            const hitPos: Vector2 = playerPos.add(hitDir);
+            const screenHitPos: Vector2 = new Vector2(startX, startY).add(hitPos.scale(tileDim));
+
+            // Draw ray
+            ctx.strokeStyle = "yellow"
+            ctx.beginPath();
+            ctx.moveTo(screenPlayerPos.x, screenPlayerPos.y);
+            ctx.lineTo(screenHitPos.x, screenHitPos.y);
+            ctx.stroke();
+
+            // Draw hit position
+            ctx.fillStyle = "red";
+            ctx.beginPath();
+            ctx.arc(screenHitPos.x, screenHitPos.y, 2, 0, 2 * Math.PI);
+            ctx.fill();
+
+        }
+
+    }
+
+    // Draw player    
+    ctx.fillStyle = "green";
+    ctx.beginPath();
+    ctx.arc(screenPlayerPos.x, screenPlayerPos.y, 5, 0, 2 * Math.PI);
+    ctx.fill();
+
+
+}
+
+function draw(ctx: CanvasRenderingContext2D, backbuffer: Backbuffer) {
     backbuffer.clear(0xff774444);
     drawFloor(backbuffer);
     drawMap3d(backbuffer);
     backbuffer.draw();
+
+    drawMiniMap(ctx, 0, 0, 200, 300);
+    
 }
 
 (() => {
@@ -426,6 +511,11 @@ function draw(backbuffer: Backbuffer) {
         throw new Error("cannot find canvas with id 'canvas'");
     }
 
+    const ctx = canvas.getContext("2d", { willReadFrequently: true }) as (CanvasRenderingContext2D | null);
+    if (ctx === null) {
+        throw new Error("2d context is not supported");
+    }
+    
     console.log("Welcome to my raycasting GAME!");
     
     canvas.width = SCREEN_WIDTH;
@@ -449,6 +539,14 @@ function draw(backbuffer: Backbuffer) {
     };
     
     window.addEventListener("keydown", (event) => {
+        if(event.key === "+") {
+            playerPos.y += 1;
+        }
+
+        if(event.key === "-") {
+            playerPos.y -= 1;
+        }        
+
         if(event.key === "w") {
             keyboard.keyW = true;
         }
@@ -506,9 +604,9 @@ function draw(backbuffer: Backbuffer) {
         }
 
         // NOTE: Update and Render the game
-        draw(backbuffer);
+        draw(ctx, backbuffer);
 
-        setTimeout(() => requestAnimationFrame(loop), 16);
+        requestAnimationFrame(loop);
     };
 
     loop();
