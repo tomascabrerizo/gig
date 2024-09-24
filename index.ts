@@ -84,6 +84,8 @@ const MAP: Array<Array<number>> = [
     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 ];
 
+
+
 const GRID_ROWS: number = MAP.length;
 const GRID_COLS: number = MAP[0].length;
 
@@ -101,12 +103,16 @@ const downSampleFactor = 1 / 4;
 const SCREEN_WIDTH: number = 1920 / 2
 const SCREEN_HEIGHT: number = 1080 / 2
 
+const playerRad: number = 0.3;
+const playerSpeed: number = 2;
+const playerRotSpeed: number = 180;
 let playerPos: Vector2 = new Vector2(GRID_COLS/2 - 3, GRID_ROWS/2 - 1);
 let playerDir: Vector2 = new Vector2(1, 0);
+let playerVel: Vector2 = new Vector2(0, 0);
+
 let cameraFOV: number = 90;
 let cameraNear: number = 1;
 
-const playerSpeed: number = 0.06;
 const TEXTURES: Texture[] = [];
 
 class Backbuffer {
@@ -406,24 +412,12 @@ function drawMap3d(backbuffer: Backbuffer) {
     }
 }
 
-function drawMiniMap(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
-    // Draw minimap
-
-    ctx.fillStyle = "black";
-    ctx.fillRect(x, y, w, h);
+function drawMiniMap(ctx: CanvasRenderingContext2D, x: number, y: number, w: number) {
     
-    let startX = x;
-    let startY = y;
-    let tileDim = 0;
-
-    if (GRID_COLS > GRID_ROWS) {
-        tileDim = w / GRID_COLS;
-        startY = h / 2 - GRID_ROWS * tileDim / 2;
-    } else {
-        tileDim = h / GRID_ROWS;
-        startX = w / 2 - GRID_COLS * tileDim / 2;
-    }
-
+    const startX = x;
+    const startY = y;
+    const tileDim = w / GRID_COLS;
+    
     ctx.fillStyle = "white";
     for (let y = 0; y < GRID_ROWS; ++y) {
         for (let x = 0; x < GRID_COLS; ++x) {
@@ -488,9 +482,146 @@ function drawMiniMap(ctx: CanvasRenderingContext2D, x: number, y: number, w: num
     // Draw player    
     ctx.fillStyle = "green";
     ctx.beginPath();
-    ctx.arc(screenPlayerPos.x, screenPlayerPos.y, 5, 0, 2 * Math.PI);
+    ctx.arc(screenPlayerPos.x, screenPlayerPos.y, playerRad*tileDim, 0, 2 * Math.PI);
     ctx.fill();
 
+    // Draw player dir
+    const playerSreenDirPos = screenPlayerPos.add(playerDir.scale(tileDim));
+    ctx.strokeStyle = "yellow"
+    ctx.beginPath();
+    ctx.moveTo(screenPlayerPos.x, screenPlayerPos.y);
+    ctx.lineTo(playerSreenDirPos.x, playerSreenDirPos.y);
+    ctx.stroke();
+
+    
+    // Draw player vel
+    const playerSreenVelPos = screenPlayerPos.add(playerVel.scale(tileDim));
+    ctx.strokeStyle = "red"
+    ctx.beginPath();
+    ctx.moveTo(screenPlayerPos.x, screenPlayerPos.y);
+    ctx.lineTo(playerSreenVelPos.x, playerSreenVelPos.y);
+    ctx.stroke();
+    
+}
+
+type TileHit = {
+    result: boolean,
+    t: number,
+};
+
+function testHorizontalTileEdge(x: number, edgeY: number, dy: number): TileHit {
+
+    if (dy !== 0) {
+        const ty = (edgeY - playerPos.y) / dy;
+        const hitPos: Vector2 = playerPos.add(playerVel.scale(ty));
+        
+        if (hitPos.x >= (x-playerRad) && hitPos.x <= (x + 1+playerRad) && ty >= 0 && ty <= 1) {
+            return { result: true, t: ty };
+        }
+    }
+
+    return { result: false, t: Infinity };
+}
+
+function testVerticalTileEdge(y: number, edgeX: number, dx: number): TileHit {
+
+    if (dx !== 0) {
+        const tx = (edgeX - playerPos.x) / dx;
+        const hitPos: Vector2 = playerPos.add(playerVel.scale(tx));
+
+        if (hitPos.y >= (y-playerRad)  && hitPos.y <= (y + 1+playerRad) && tx >= 0 && tx <= 1) {
+            return { result: true, t: tx };
+        }
+    }
+
+    return { result: false, t: Infinity };
+}
+
+
+type Keyboard = {
+    keyW: boolean,
+    keyS: boolean,
+    keyRight: boolean,
+    keyLeft: boolean,
+};
+
+
+let keyboard: Keyboard = { keyW: false, keyS: false, keyRight: false, keyLeft: false};
+let lastKeyboard: Keyboard = { keyW: false, keyS: false, keyRight: false, keyLeft: false};
+
+function update(dt: number) { 
+    
+    if (keyboard.keyW === true) {
+        playerVel = playerDir.scale(playerSpeed * dt);
+    }
+
+    if(lastKeyboard.keyW === true && keyboard.keyW === false) {
+        playerVel = new Vector2(0, 0);
+    }
+    
+    if (keyboard.keyS === true) {
+        playerVel = playerDir.scale(-playerSpeed * dt);
+    }
+
+    if(lastKeyboard.keyS === true && keyboard.keyS === false) {
+        playerVel = new Vector2(0, 0);
+    }
+
+    
+    if (keyboard.keyLeft === true) {
+        playerDir = playerDir.rotate(-playerRotSpeed * dt);
+        playerVel = playerVel.rotate(-playerRotSpeed * dt);
+    }
+    if (keyboard.keyRight === true) {
+        playerDir = playerDir.rotate(playerRotSpeed * dt);
+        playerVel = playerVel.rotate(playerRotSpeed * dt);
+    }
+
+
+    let normal = new Vector2(0, 0);
+
+    for (let y = 0; y < GRID_ROWS; ++y) {
+        for (let x = 0; x < GRID_COLS; ++x) {
+            const mapIndex = MAP[y][x];
+            if (mapIndex > 0) {
+
+                let t = Infinity;
+
+                let edgeTest;
+                edgeTest = testHorizontalTileEdge(x, y - playerRad, playerVel.y);
+                if (edgeTest.result && edgeTest.t < t) {
+                    t = edgeTest.t;
+                    normal = new Vector2(0, 1);
+                }
+
+                edgeTest = testHorizontalTileEdge(x, y + 1 + playerRad, playerVel.y);
+                if (edgeTest.result && edgeTest.t < t) {
+                    t = edgeTest.t;
+                    normal = new Vector2(0, -1);
+                }
+
+                edgeTest = testVerticalTileEdge(y, x - playerRad, playerVel.x);
+                if (edgeTest.result && edgeTest.t < t) {
+                    t = edgeTest.t;
+                    normal = new Vector2(-1, 0);
+                }
+
+                edgeTest = testVerticalTileEdge(y, x + 1 + playerRad, playerVel.x);
+                if (edgeTest.result && edgeTest.t < t) {
+                    t = edgeTest.t;
+                    normal = new Vector2(1, 0);
+                }
+
+                if (t < Infinity) {
+                    const perp = normal.perp();
+                    playerVel = perp.scale(playerVel.dot(perp));
+                }
+            }
+        }
+
+    }
+
+    playerPos = playerPos.add(playerVel);
 
 }
 
@@ -500,7 +631,7 @@ function draw(ctx: CanvasRenderingContext2D, backbuffer: Backbuffer) {
     drawMap3d(backbuffer);
     backbuffer.draw();
 
-    drawMiniMap(ctx, 0, 0, 200, 300);
+    drawMiniMap(ctx, 0, 0, 200);
     
 }
 
@@ -524,29 +655,7 @@ function draw(ctx: CanvasRenderingContext2D, backbuffer: Backbuffer) {
 
     const backbuffer = new Backbuffer(canvas, canvas.width*downSampleFactor, canvas.height*downSampleFactor);
     
-    type Keyboard = {
-        keyW: boolean,
-        keyS: boolean,
-        keyRight: boolean,
-        keyLeft: boolean,
-    };
-
-    const keyboard: Keyboard = {
-        keyW: false,
-        keyS: false,
-        keyRight: false,
-        keyLeft: false,
-    };
-    
     window.addEventListener("keydown", (event) => {
-        if(event.key === "+") {
-            playerPos.y += 1;
-        }
-
-        if(event.key === "-") {
-            playerPos.y -= 1;
-        }        
-
         if(event.key === "w") {
             keyboard.keyW = true;
         }
@@ -575,40 +684,22 @@ function draw(ctx: CanvasRenderingContext2D, backbuffer: Backbuffer) {
             keyboard.keyRight = false;
         }
     });
+
+    let lastTime: number = 0;
     
-    const loop = () => {
+    const loop = (currentTime: number) => {
 
-        // TODO: Improve collision detection and resolution
+        let dt: number = (currentTime - lastTime) / 1000;
+        lastTime = currentTime;        
 
-        let playerNewPos = playerPos;
-        
-        // NOTE: Get keyboard input
-        if(keyboard.keyW === true) {
-            playerNewPos = playerPos.add(playerDir.scale(playerSpeed));
-        }
-        if (keyboard.keyS === true) {
-            playerNewPos = playerPos.sub(playerDir.scale(playerSpeed));
-        }
-        if (keyboard.keyLeft === true) {
-            playerDir = playerDir.rotate(-5);
-        }
-        if(keyboard.keyRight === true) {
-            playerDir = playerDir.rotate(5);
-        }
-
-        const tileX = Math.floor(playerNewPos.x);
-        const tileY = Math.floor(playerNewPos.y);
-        
-        if (MAP[tileY][tileX] === 0) {
-            playerPos = playerNewPos;
-        }
-
-        // NOTE: Update and Render the game
+        update(dt);
         draw(ctx, backbuffer);
 
+        lastKeyboard = {...keyboard};
+        
         requestAnimationFrame(loop);
     };
 
-    loop();
+    requestAnimationFrame(loop);
     
 })();
