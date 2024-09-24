@@ -104,8 +104,8 @@ const SCREEN_WIDTH: number = 1920 / 2
 const SCREEN_HEIGHT: number = 1080 / 2
 
 const playerRad: number = 0.3;
-const playerSpeed: number = 2;
-const playerRotSpeed: number = 180;
+const playerSpeed: number = 3;
+const playerRotSpeed: number = 240;
 let playerPos: Vector2 = new Vector2(GRID_COLS/2 - 3, GRID_ROWS/2 - 1);
 let playerDir: Vector2 = new Vector2(1, 0);
 let playerVel: Vector2 = new Vector2(0, 0);
@@ -355,6 +355,7 @@ function drawFloor(backbuffer: Backbuffer) {
     const p2: Vector2 = playerDir.add(halfPlaneDir());
 
     const floorTexture: Texture = TEXTURES[4];
+    const ceilTexture: Texture = TEXTURES[4];
     
     for(let y = yStart; y < backbuffer.height; ++y) {
         const posY = cameraPosY - y;
@@ -367,11 +368,16 @@ function drawFloor(backbuffer: Backbuffer) {
             const tx: number = Math.floor((floor.x - Math.floor(floor.x)) * floorTexture.width);
             const ty: number = Math.floor((floor.y - Math.floor(floor.y)) * floorTexture.height);
 
-            const color: number = floorTexture.pixels[ty * floorTexture.width + tx];
-            backbuffer.buffer[y * backbuffer.width + x] = color;
-
-            const ceilingY: number = (backbuffer.height - y - 1);
-            backbuffer.buffer[ceilingY * backbuffer.width + x] = color;
+            {
+                const color: number = floorTexture.pixels[ty * floorTexture.width + tx];
+                backbuffer.buffer[y * backbuffer.width + x] = color;
+            }
+            
+            {
+                const color: number = ceilTexture.pixels[ty * ceilTexture.width + tx];
+                const ceilingY: number = (backbuffer.height - y - 1);
+                backbuffer.buffer[ceilingY * backbuffer.width + x] = color;
+            }
         }        
     }
 }
@@ -417,19 +423,40 @@ function drawMiniMap(ctx: CanvasRenderingContext2D, x: number, y: number, w: num
     const startX = x;
     const startY = y;
     const tileDim = w / GRID_COLS;
+
+    // Draw tilemap
     
-    ctx.fillStyle = "white";
     for (let y = 0; y < GRID_ROWS; ++y) {
         for (let x = 0; x < GRID_COLS; ++x) {
-            ctx.fillRect(startX + x * tileDim, startY + y * tileDim, tileDim, tileDim);
             const textureIndex = MAP[y][x] - 1;
             if (textureIndex >= 0) {
                 const texture: HTMLImageElement = document.images[textureIndex];
+                ctx.drawImage(texture, startX + x * tileDim, startY + y * tileDim, tileDim, tileDim);
+            } else {
+                const texture: HTMLImageElement = document.images[4];
                 ctx.drawImage(texture, startX + x * tileDim, startY + y * tileDim, tileDim, tileDim);
             }
 
         }
     }
+
+    let newPlayerPos: Vector2 = playerPos.add(playerVel);
+
+    const cellX = Math.floor(playerPos.x);
+    const cellY = Math.floor(playerPos.y);
+    const targetCellX = Math.floor(newPlayerPos.x);
+    const targetCellY = Math.floor(newPlayerPos.y);
+    
+    const minX = Math.max(Math.min(cellX, targetCellX) - 1, 0);
+    const maxX = Math.min(Math.max(cellX, targetCellX) + 1, GRID_COLS);
+
+    const minY = Math.max(Math.min(cellY, targetCellY) - 1, 0);
+    const maxY = Math.min(Math.max(cellY, targetCellY) + 1, GRID_ROWS);
+
+    ctx.fillStyle = "rgb(0, 0, 255, 0.3)"
+    ctx.fillRect(minX*tileDim, minY*tileDim, (maxX - minX + 1)*tileDim, (maxY - minY + 1)*tileDim)
+
+    // Draw grid
 
     ctx.strokeStyle = "black"
     for (let y = 0; y < GRID_ROWS; ++y) {
@@ -449,7 +476,7 @@ function drawMiniMap(ctx: CanvasRenderingContext2D, x: number, y: number, w: num
     const screenPlayerPos = new Vector2(startX, startY).add(playerPos.scale(tileDim));
 
     // Draw rays
-    const rayAmount = 10;
+    const rayAmount = 20;
 
     for (let index = 0; index < rayAmount; ++index) {
 
@@ -478,7 +505,7 @@ function drawMiniMap(ctx: CanvasRenderingContext2D, x: number, y: number, w: num
         }
 
     }
-
+    
     // Draw player    
     ctx.fillStyle = "green";
     ctx.beginPath();
@@ -504,69 +531,38 @@ function drawMiniMap(ctx: CanvasRenderingContext2D, x: number, y: number, w: num
     
 }
 
-type TileHit = {
-    result: boolean,
-    t: number,
-};
-
-function testHorizontalTileEdge(x: number, edgeY: number, dy: number): TileHit {
-
-    if (dy !== 0) {
-        const ty = (edgeY - playerPos.y) / dy;
-        const hitPos: Vector2 = playerPos.add(playerVel.scale(ty));
-        
-        if (hitPos.x >= (x-playerRad) && hitPos.x <= (x + 1+playerRad) && ty >= 0 && ty <= 1) {
-            return { result: true, t: ty };
-        }
-    }
-
-    return { result: false, t: Infinity };
-}
-
-function testVerticalTileEdge(y: number, edgeX: number, dx: number): TileHit {
-
-    if (dx !== 0) {
-        const tx = (edgeX - playerPos.x) / dx;
-        const hitPos: Vector2 = playerPos.add(playerVel.scale(tx));
-
-        if (hitPos.y >= (y-playerRad)  && hitPos.y <= (y + 1+playerRad) && tx >= 0 && tx <= 1) {
-            return { result: true, t: tx };
-        }
-    }
-
-    return { result: false, t: Infinity };
-}
-
-
 type Keyboard = {
     keyW: boolean,
     keyS: boolean,
+    keyA: boolean,
+    keyD: boolean,
     keyRight: boolean,
     keyLeft: boolean,
 };
 
-
-let keyboard: Keyboard = { keyW: false, keyS: false, keyRight: false, keyLeft: false};
-let lastKeyboard: Keyboard = { keyW: false, keyS: false, keyRight: false, keyLeft: false};
+let keyboard: Keyboard = { keyW: false, keyS: false, keyA: false, keyD: false,  keyRight: false, keyLeft: false};
 
 function update(dt: number) { 
+
+    playerVel = new Vector2(0, 0);
     
     if (keyboard.keyW === true) {
-        playerVel = playerDir.scale(playerSpeed * dt);
-    }
-
-    if(lastKeyboard.keyW === true && keyboard.keyW === false) {
-        playerVel = new Vector2(0, 0);
+        playerVel = playerVel.add(playerDir.scale(1));
     }
     
     if (keyboard.keyS === true) {
-        playerVel = playerDir.scale(-playerSpeed * dt);
+        playerVel = playerVel.add(playerDir.scale(-1));
     }
 
-    if(lastKeyboard.keyS === true && keyboard.keyS === false) {
-        playerVel = new Vector2(0, 0);
+    if (keyboard.keyA === true) {
+        playerVel = playerVel.add(playerDir.perp().scale(-1));
     }
 
+    if (keyboard.keyD === true) {
+        playerVel = playerVel.add(playerDir.perp().scale(1));
+    }
+
+    playerVel = playerVel.norm().scale(playerSpeed * dt);
     
     if (keyboard.keyLeft === true) {
         playerDir = playerDir.rotate(-playerRotSpeed * dt);
@@ -577,52 +573,40 @@ function update(dt: number) {
         playerVel = playerVel.rotate(playerRotSpeed * dt);
     }
 
+    let newPlayerPos: Vector2 = playerPos.add(playerVel);
 
-    let normal = new Vector2(0, 0);
+    const cellX = Math.floor(playerPos.x);
+    const cellY = Math.floor(playerPos.y);
+    const targetCellX = Math.floor(newPlayerPos.x);
+    const targetCellY = Math.floor(newPlayerPos.y);
 
-    for (let y = 0; y < GRID_ROWS; ++y) {
-        for (let x = 0; x < GRID_COLS; ++x) {
-            const mapIndex = MAP[y][x];
-            if (mapIndex > 0) {
+    const minX = Math.max(Math.min(cellX, targetCellX) - 1, 0);
+    const maxX = Math.min(Math.max(cellX, targetCellX) + 1, GRID_COLS - 1);
+    const minY = Math.max(Math.min(cellY, targetCellY) - 1, 0);
+    const maxY = Math.min(Math.max(cellY, targetCellY) + 1, GRID_ROWS - 1);
 
-                let t = Infinity;
+    for (let y = minY; y <= maxY; ++y) {
+        for (let x = minX; x <= maxX; ++x) {
 
-                let edgeTest;
-                edgeTest = testHorizontalTileEdge(x, y - playerRad, playerVel.y);
-                if (edgeTest.result && edgeTest.t < t) {
-                    t = edgeTest.t;
-                    normal = new Vector2(0, 1);
+            if(MAP[y][x] > 0) {
+                const closestPoint: Vector2 = new Vector2(
+                    Math.min(Math.max(x, newPlayerPos.x), x + 1),
+                    Math.min(Math.max(y, newPlayerPos.y), y + 1),
+                );
+
+                const rayToClosest = closestPoint.sub(newPlayerPos);
+                let overlap = playerRad - rayToClosest.length();
+
+                if (overlap > 0) {
+                    newPlayerPos = newPlayerPos.add(rayToClosest.norm().scale(-overlap));
                 }
 
-                edgeTest = testHorizontalTileEdge(x, y + 1 + playerRad, playerVel.y);
-                if (edgeTest.result && edgeTest.t < t) {
-                    t = edgeTest.t;
-                    normal = new Vector2(0, -1);
-                }
-
-                edgeTest = testVerticalTileEdge(y, x - playerRad, playerVel.x);
-                if (edgeTest.result && edgeTest.t < t) {
-                    t = edgeTest.t;
-                    normal = new Vector2(-1, 0);
-                }
-
-                edgeTest = testVerticalTileEdge(y, x + 1 + playerRad, playerVel.x);
-                if (edgeTest.result && edgeTest.t < t) {
-                    t = edgeTest.t;
-                    normal = new Vector2(1, 0);
-                }
-
-                if (t < Infinity) {
-                    const perp = normal.perp();
-                    playerVel = perp.scale(playerVel.dot(perp));
-                }
             }
+            
         }
-
     }
-
-    playerPos = playerPos.add(playerVel);
-
+    
+    playerPos = newPlayerPos;    
 }
 
 function draw(ctx: CanvasRenderingContext2D, backbuffer: Backbuffer) {
@@ -662,6 +646,12 @@ function draw(ctx: CanvasRenderingContext2D, backbuffer: Backbuffer) {
         if(event.key === "s") {
             keyboard.keyS = true;
         }
+        if(event.key === "a") {
+            keyboard.keyA = true;
+        }
+        if(event.key === "d") {
+            keyboard.keyD = true;
+        }
         if(event.key === "ArrowLeft") {
             keyboard.keyLeft = true;
         }
@@ -676,6 +666,12 @@ function draw(ctx: CanvasRenderingContext2D, backbuffer: Backbuffer) {
         }
         if (event.key === "s") {
             keyboard.keyS = false;
+        }
+        if (event.key === "a") {
+            keyboard.keyA = false;
+        }
+        if (event.key === "d") {
+            keyboard.keyD = false;
         }
         if (event.key === "ArrowLeft") {
             keyboard.keyLeft = false;
@@ -695,8 +691,6 @@ function draw(ctx: CanvasRenderingContext2D, backbuffer: Backbuffer) {
         update(dt);
         draw(ctx, backbuffer);
 
-        lastKeyboard = {...keyboard};
-        
         requestAnimationFrame(loop);
     };
 
