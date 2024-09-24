@@ -446,12 +446,14 @@ function drawMiniMap(ctx: CanvasRenderingContext2D, x: number, y: number, w: num
     const cellY = Math.floor(playerPos.y);
     const targetCellX = Math.floor(newPlayerPos.x);
     const targetCellY = Math.floor(newPlayerPos.y);
-    
-    const minX = Math.max(Math.min(cellX, targetCellX) - 1, 0);
-    const maxX = Math.min(Math.max(cellX, targetCellX) + 1, GRID_COLS);
 
-    const minY = Math.max(Math.min(cellY, targetCellY) - 1, 0);
-    const maxY = Math.min(Math.max(cellY, targetCellY) + 1, GRID_ROWS);
+    const offset = Math.ceil(playerRad);
+    
+    const minX = Math.max(Math.min(cellX, targetCellX) - offset, 0);
+    const maxX = Math.min(Math.max(cellX, targetCellX) + offset, GRID_COLS-1);
+
+    const minY = Math.max(Math.min(cellY, targetCellY) - offset, 0);
+    const maxY = Math.min(Math.max(cellY, targetCellY) + offset, GRID_ROWS-1);
 
     ctx.fillStyle = "rgb(0, 0, 255, 0.3)"
     ctx.fillRect(minX*tileDim, minY*tileDim, (maxX - minX + 1)*tileDim, (maxY - minY + 1)*tileDim)
@@ -580,10 +582,12 @@ function update(dt: number) {
     const targetCellX = Math.floor(newPlayerPos.x);
     const targetCellY = Math.floor(newPlayerPos.y);
 
-    const minX = Math.max(Math.min(cellX, targetCellX) - 1, 0);
-    const maxX = Math.min(Math.max(cellX, targetCellX) + 1, GRID_COLS - 1);
-    const minY = Math.max(Math.min(cellY, targetCellY) - 1, 0);
-    const maxY = Math.min(Math.max(cellY, targetCellY) + 1, GRID_ROWS - 1);
+    const offset = Math.ceil(playerRad);
+    
+    const minX = Math.max(Math.min(cellX, targetCellX) - offset, 0);
+    const maxX = Math.min(Math.max(cellX, targetCellX) + offset, GRID_COLS - 1);
+    const minY = Math.max(Math.min(cellY, targetCellY) - offset, 0);
+    const maxY = Math.min(Math.max(cellY, targetCellY) + offset, GRID_ROWS - 1);
 
     for (let y = minY; y <= maxY; ++y) {
         for (let x = minX; x <= maxX; ++x) {
