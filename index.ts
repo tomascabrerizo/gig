@@ -429,7 +429,7 @@ function drawSprites(backbuffer: Backbuffer) {
             const z = a.dot(playerDir.norm());
             
             const spriteDim = Math.floor(200 / z);
-            const y = Math.floor(backbuffer.height/2 - spriteDim / 2);
+            const y = Math.floor(backbuffer.height/2 - spriteDim / 2) + Math.floor(200/z);
             const screenX = Math.floor(t * (backbuffer.width - 1));
             const startX = screenX - Math.floor(spriteDim / 2);
             const endX = screenX + Math.floor(spriteDim / 2);
