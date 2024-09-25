@@ -115,11 +115,12 @@ let playerVel: Vector2 = new Vector2(0, 0);
 
 let cameraFOV: number = 90;
 let cameraNear: number = 1;
+let cameraFar: number = 10;
 
 const TEXTURES: Texture[] = [];
 
 let spriteTextureIndex = 0;
-let spriteTextureSpeed = 0.5;
+let spriteTextureSpeed = 0.7;
 let spriteTextureCurrentTime = 0;
 
 class Backbuffer {
@@ -182,7 +183,6 @@ class Backbuffer {
     }
 
     draw() {
-        this.ctx.reset();
         this.ctx.putImageData(this.imageData, 0, 0);
         this.ctx.drawImage(this.canvas, 0, 0, this.width, this.height, 0, 0, this.canvas.width, this.canvas.height);
     }
@@ -220,7 +220,7 @@ class Backbuffer {
     drawTexture(texture: Texture,
         srcX: number, srcY: number, srcW: number, srcH: number,
         desX: number, desY: number, desW: number, desH: number,
-        vertical?: boolean) {
+                vertical?: boolean, fogColor?: number, fogT?: number) {
 
         let minX = desX;
         let maxX = minX + (desW - 1);
@@ -259,14 +259,31 @@ class Backbuffer {
                 
                 let srcColor = texture.pixels[srcOffsetY * texture.width + srcOffsetX];
 
+                // TODO: add a flag to render textures using real alpha bending
                 const a = ((srcColor >> 24) & 0xff);
-                if(a === 0) continue;
+                if(a < Math.floor(0xff/2)) continue;
                 
                 if (vertical === true) {
                     const scale = 0.4;
                     const r = ((srcColor >> 16) & 0xff) * scale;
                     const g = ((srcColor >> 8) & 0xff) * scale;
                     const b = ((srcColor >> 0) & 0xff) * scale;
+                    srcColor = (0xff << 24) | (r << 16) | (g << 8) | (b);
+                }
+
+                if(fogColor && fogT) {
+                    const dr = ((fogColor >> 16) & 0xff);
+                    const dg = ((fogColor >> 8) & 0xff);
+                    const db = ((fogColor >> 0) & 0xff);
+
+                    const sr = ((srcColor >> 16) & 0xff);
+                    const sg = ((srcColor >> 8) & 0xff);
+                    const sb = ((srcColor >> 0) & 0xff);
+
+                    const r = Math.floor(sr * (1-fogT) + dr * fogT);
+                    const g = Math.floor(sg * (1-fogT) + dg * fogT);
+                    const b = Math.floor(sb * (1-fogT) + db * fogT);
+                    
                     srcColor = (0xff << 24) | (r << 16) | (g << 8) | (b);
                 }
 
@@ -319,10 +336,7 @@ function calculateNearIntersection(pos: Vector2, dir: Vector2): Hit {
         edgeY = pos.y;
     }
     
-    let maxSteps = 50;
-    while (maxSteps > 0) {
-        maxSteps = maxSteps - 1;
-
+    for(;;) {
         let tx: number = Infinity;
         if (dx !== 0) {
             tx = (edgeX - pos.x) / dx;
@@ -347,13 +361,15 @@ function calculateNearIntersection(pos: Vector2, dir: Vector2): Hit {
             isVertical = true;
         }
 
+        if(mapY < 0 || mapY >= GRID_ROWS || mapX < 0 || mapX >= GRID_COLS) {
+            return { result: false, t: 0, texture: TEXTURES[0], isVertical: false };
+        }
+        
         const mapIndex = MAP[mapY][mapX];
         if (mapIndex !== undefined &&  mapIndex !== 0) {
             return { result: true, t, texture: TEXTURES[mapIndex - 1], isVertical };
         }
     }
-
-    return { result: false, t: 0, texture: TEXTURES[0], isVertical: false };
 }
 
 function halfPlaneDir(): Vector2 {
@@ -361,6 +377,21 @@ function halfPlaneDir(): Vector2 {
     const planeHalfLength: number = cameraNear * Math.tan(halfFovRad);
     const planeDir = playerDir.perp().norm().scale(planeHalfLength);
     return planeDir;
+}
+
+function easeInExpo(x: number): number {
+    return x === 0 ? 0 : Math.pow(2, 10 * x - 10);
+}
+
+function calculateFog(distance:number): { color: number, t: number } {
+    const fogColor = 0xff88bb88;
+    //const fogT = Math.max(Math.min((hitDir.length() - (cameraFar - fogStart)) / cameraFar, 1) , 0);
+    const t = Math.max(Math.min(distance / cameraFar, 1), 0);
+    const fogT = t*t * (3 - 2 * t);
+    return {
+        color: fogColor,
+        t: fogT
+    };
 }
 
 function drawFloor(backbuffer: Backbuffer) {
@@ -384,13 +415,49 @@ function drawFloor(backbuffer: Backbuffer) {
             const tx: number = Math.floor((floor.x - Math.floor(floor.x)) * floorTexture.width);
             const ty: number = Math.floor((floor.y - Math.floor(floor.y)) * floorTexture.height);
 
+            const fog = calculateFog(distance);
+
             {
-                const color: number = floorTexture.pixels[ty * floorTexture.width + tx];
+                const fogT = fog.t;
+                const fogColor = fog.color;
+                const srcColor: number = floorTexture.pixels[ty * floorTexture.width + tx];
+
+                const dr = ((fogColor >> 16) & 0xff);
+                const dg = ((fogColor >> 8) & 0xff);
+                const db = ((fogColor >> 0) & 0xff);
+
+                const sr = ((srcColor >> 16) & 0xff);
+                const sg = ((srcColor >> 8) & 0xff);
+                const sb = ((srcColor >> 0) & 0xff);
+
+                const r = Math.floor(sr * (1 - fogT) + dr * fogT);
+                const g = Math.floor(sg * (1 - fogT) + dg * fogT);
+                const b = Math.floor(sb * (1 - fogT) + db * fogT);
+
+                let color = (0xff << 24) | (r << 16) | (g << 8) | (b);
+
                 backbuffer.buffer[y * backbuffer.width + x] = color;
             }
             
-            {
-                const color: number = ceilTexture.pixels[ty * ceilTexture.width + tx];
+            {                
+                const fogT = fog.t;
+                const fogColor = fog.color;
+                const srcColor: number = ceilTexture.pixels[ty * ceilTexture.width + tx];
+
+                const dr = ((fogColor >> 16) & 0xff);
+                const dg = ((fogColor >> 8) & 0xff);
+                const db = ((fogColor >> 0) & 0xff);
+
+                const sr = ((srcColor >> 16) & 0xff);
+                const sg = ((srcColor >> 8) & 0xff);
+                const sb = ((srcColor >> 0) & 0xff);
+
+                const r = Math.floor(sr * (1 - fogT) + dr * fogT);
+                const g = Math.floor(sg * (1 - fogT) + dg * fogT);
+                const b = Math.floor(sb * (1 - fogT) + db * fogT);
+
+                let color = (0xff << 24) | (r << 16) | (g << 8) | (b);
+
                 const ceilingY: number = (backbuffer.height - y - 1);
                 backbuffer.buffer[ceilingY * backbuffer.width + x] = color;
             }
@@ -406,8 +473,8 @@ function drawSprites(backbuffer: Backbuffer) {
         const distanceToB = playerPos.sub(b).length(); 
         return distanceToB - distanceToA;
     });
-    // Draw sprites
     
+    // Draw sprites
     const halfCameraPlane = halfPlaneDir();
     const p0 = playerDir.sub(halfCameraPlane);
     const p1 = playerDir.add(halfCameraPlane);
@@ -454,7 +521,9 @@ function drawSprites(backbuffer: Backbuffer) {
                 const srcW = 1;
                 const srcH = spriteTexture.height;
 
-                backbuffer.drawTexture(spriteTexture, srcX, srcY, srcW, srcH, index, y, 1, spriteDim);
+                const fog = calculateFog(z);
+                
+                backbuffer.drawTexture(spriteTexture, srcX, srcY, srcW, srcH, index, y, 1, spriteDim, false, fog.color, fog.t);
 
             }
 
@@ -495,8 +564,8 @@ function drawMap3d(backbuffer: Backbuffer) {
             const srcY = 0;
             const srcW = 1;
             const srcH = hit.texture.height;
-
-            backbuffer.drawTexture(hit.texture, srcX, srcY, srcW, srcH, index, y, 1, height, hit.isVertical);
+            const fog = calculateFog(z);
+            backbuffer.drawTexture(hit.texture, srcX, srcY, srcW, srcH, index, y, 1, height, hit.isVertical, fog.color, fog.t);
         }
     }
 }
@@ -687,16 +756,25 @@ function update(dt: number) {
 
     // NOTE: Update sprite animation
     const timePerImage = spriteTextureSpeed / 5;
-    if(spriteTextureCurrentTime >= timePerImage) {
-        spriteTextureCurrentTime = 0;
-        spriteTextureIndex = (spriteTextureIndex + 1) % 5;
-    } else {
-        spriteTextureCurrentTime += dt;
-    }
+    spriteTextureIndex = Math.floor(spriteTextureCurrentTime / timePerImage) % 5;
+    spriteTextureCurrentTime += dt;
+    
+    // const timePerImage = spriteTextureSpeed / 5;
+    // if(spriteTextureCurrentTime >= timePerImage) {
+    //     spriteTextureCurrentTime = 0;
+    //     spriteTextureIndex = (spriteTextureIndex + 1) % 5;
+    // } else {
+    //     spriteTextureCurrentTime += dt;
+    // }
     
 }
 
 function draw(ctx: CanvasRenderingContext2D, backbuffer: Backbuffer) {
+    ctx.reset();
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = "red";
+    ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+    
     backbuffer.clear(0xff774444);
     drawFloor(backbuffer);
     drawMap3d(backbuffer);
@@ -725,7 +803,7 @@ window.onload = () => {
     canvas.height = SCREEN_HEIGHT;
     canvas.style.backgroundColor = "#444444";
 
-    const backbuffer = new Backbuffer(canvas, canvas.width*downSampleFactor, canvas.height*downSampleFactor);
+    const backbuffer = new Backbuffer(canvas, Math.ceil(canvas.width*downSampleFactor), Math.ceil(canvas.height*downSampleFactor));
     
     window.addEventListener("keydown", (event) => {
         if(event.key === "w") {
