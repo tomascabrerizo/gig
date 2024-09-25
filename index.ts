@@ -400,6 +400,14 @@ function drawFloor(backbuffer: Backbuffer) {
 
 function drawSprites(backbuffer: Backbuffer) {
 
+    // Sort srites
+    SPRITES.sort((a, b) => {
+        const distanceToA = playerPos.sub(a).length();
+        const distanceToB = playerPos.sub(b).length(); 
+        return distanceToB - distanceToA;
+    });
+    // Draw sprites
+    
     const halfCameraPlane = halfPlaneDir();
     const p0 = playerDir.sub(halfCameraPlane);
     const p1 = playerDir.add(halfCameraPlane);
