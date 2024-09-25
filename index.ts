@@ -64,41 +64,44 @@ type Texture = {
 }
 
 const MAP: Array<Array<number>> = [
-    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-    [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 2, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 2, 0, 3, 0, 1, 0, 0, 1],
-    [1, 0, 2, 0, 0, 0, 1, 0, 0, 1],
-    [1, 0, 2, 0, 0, 0, 1, 0, 0, 1],
-    [1, 0, 0, 0, 3, 3, 3, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 0, 4, 0, 4, 0, 0, 0, 1],
-    [1, 0, 0, 4, 0, 0, 4, 0, 0, 1],
-    [1, 0, 0, 4, 0, 0, 4, 0, 0, 1],
-    [1, 0, 0, 4, 0, 0, 4, 0, 0, 1],
-    [1, 0, 0, 0, 4, 4, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 2, 0, 0, 0, 0, 3, 3, 3, 3, 1],
+    [1, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 2, 0, 0, 0, 2, 2, 0, 2, 2, 1],
+    [1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1],
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 ];
-
-
 
 const GRID_ROWS: number = MAP.length;
 const GRID_COLS: number = MAP[0].length;
 
-const MAP_COLORS: string[] = [
-    "#000000",
-    "#ff0000",
-    "#00ff00",
-    "#0000ff",
-    "#ff00ff",
-    "#00ffff"
-];
+const SPRITES: Vector2[] = [
+    new Vector2(1.5, 1.5),
+    new Vector2(2.5, 1.5),
+    new Vector2(3.5, 1.5),
+    new Vector2(4.5, 1.5),
 
-const downSampleFactor = 1 / 4;
+    new Vector2(GRID_COLS/2, GRID_ROWS/2),
+    new Vector2(GRID_COLS/2-1, GRID_ROWS/2),
+    new Vector2(GRID_COLS/2+1, GRID_ROWS/2),
+    new Vector2(GRID_COLS/2, GRID_ROWS/2-1),
+    new Vector2(GRID_COLS/2, GRID_ROWS/2+1),
+
+]
+
+const downSampleFactor = 1 / 1;
 
 const SCREEN_WIDTH: number = 1920 / 2
 const SCREEN_HEIGHT: number = 1080 / 2
@@ -115,15 +118,22 @@ let cameraNear: number = 1;
 
 const TEXTURES: Texture[] = [];
 
+let spriteTextureIndex = 0;
+let spriteTextureSpeed = 0.5;
+let spriteTextureCurrentTime = 0;
+
 class Backbuffer {
     canvas: HTMLCanvasElement;
     ctx: CanvasRenderingContext2D;
     imageData: ImageData;
     buffer: Uint32Array;
 
+    
     width: number;
     height: number;
- 
+
+    zBuffer: Array<number>;
+    
     constructor(canvas: HTMLCanvasElement, width: number, height: number) {
 
         this.canvas = canvas;
@@ -139,6 +149,9 @@ class Backbuffer {
         this.width = width;
         this.height = height;
 
+        this.zBuffer = new Array<number>(this.width);
+        this.zBuffer.fill(0);
+        
         const saveCanvasWidth = canvas.width;
         const saveCanvasHeight = canvas.height;
 
@@ -243,9 +256,12 @@ class Backbuffer {
                 const srcOffsetY = srcY + Math.floor(ty * srcH);
                 const desOffsetX = x;
                 const desOffsetY = y;
-
+                
                 let srcColor = texture.pixels[srcOffsetY * texture.width + srcOffsetX];
 
+                const a = ((srcColor >> 24) & 0xff);
+                if(a === 0) continue;
+                
                 if (vertical === true) {
                     const scale = 0.4;
                     const r = ((srcColor >> 16) & 0xff) * scale;
@@ -303,7 +319,7 @@ function calculateNearIntersection(pos: Vector2, dir: Vector2): Hit {
         edgeY = pos.y;
     }
     
-    let maxSteps = 20;
+    let maxSteps = 50;
     while (maxSteps > 0) {
         maxSteps = maxSteps - 1;
 
@@ -382,6 +398,63 @@ function drawFloor(backbuffer: Backbuffer) {
     }
 }
 
+function drawSprites(backbuffer: Backbuffer) {
+
+    const halfCameraPlane = halfPlaneDir();
+    const p0 = playerDir.sub(halfCameraPlane);
+    const p1 = playerDir.add(halfCameraPlane);
+    const cameraPlane = p1.sub(p0);
+    const cameraPlaneNorm = cameraPlane.norm();
+    const cameraPlaneLen = cameraPlane.length();
+
+    const near = playerDir.norm().scale(cameraNear);
+    const nearLen = near.length();
+
+    const spriteTextureBase = 5;
+    const spriteTexture: Texture = TEXTURES[spriteTextureBase + spriteTextureIndex];
+    
+    SPRITES.forEach((sprite) => {
+        const spritePos: Vector2 = sprite;
+
+        const a = spritePos.sub(playerPos);
+        const aLen = a.length();
+
+        const denom = a.dot(near);
+        if (denom > 0) {
+
+            const cLen: number = (aLen * nearLen * nearLen) / denom;
+            const c = a.norm().scale(cLen);
+
+            const t: number = c.sub(p0).dot(cameraPlaneNorm) / cameraPlaneLen;
+            const z = a.dot(playerDir.norm());
+            
+            const spriteDim = Math.floor(200 / z);
+            const y = Math.floor(backbuffer.height/2 - spriteDim / 2);
+            const screenX = Math.floor(t * (backbuffer.width - 1));
+            const startX = screenX - Math.floor(spriteDim / 2);
+            const endX = screenX + Math.floor(spriteDim / 2);
+
+            for(let index = startX; index <= endX; ++index) {
+
+                if(index < 0 || index >= backbuffer.width) continue;
+                if(z >= backbuffer.zBuffer[index]) continue;
+
+                const samplePosX = (index - startX) / (endX - startX);
+  
+                const srcX = Math.round(samplePosX * (spriteTexture.width - 1));
+                const srcY = 0;
+                const srcW = 1;
+                const srcH = spriteTexture.height;
+
+                backbuffer.drawTexture(spriteTexture, srcX, srcY, srcW, srcH, index, y, 1, spriteDim);
+
+            }
+
+        }
+    });
+
+}
+
 function drawMap3d(backbuffer: Backbuffer) {
 
     const rayAmount = backbuffer.width;
@@ -396,6 +469,8 @@ function drawMap3d(backbuffer: Backbuffer) {
             const hitDir: Vector2 = rayDir.scale(hit.t);
             const hitPos: Vector2 = playerPos.add(hitDir);
             const z = hitDir.dot(playerDir.norm());
+
+            backbuffer.zBuffer[index] = z;
             
             const height = Math.floor(backbuffer.height / z);
             const y = Math.floor((backbuffer.height / 2) - (height / 2));
@@ -408,7 +483,7 @@ function drawMap3d(backbuffer: Backbuffer) {
                 samplePosX = hitPos.y - Math.floor(hitPos.y);
             }
             
-            const srcX = Math.floor(samplePosX * (hit.texture.width - 1));
+            const srcX = Math.round(samplePosX * (hit.texture.width - 1));
             const srcY = 0;
             const srcW = 1;
             const srcH = hit.texture.height;
@@ -460,7 +535,7 @@ function drawMiniMap(ctx: CanvasRenderingContext2D, x: number, y: number, w: num
 
     // Draw grid
 
-    ctx.strokeStyle = "black"
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.5)"
     for (let y = 0; y < GRID_ROWS; ++y) {
         ctx.beginPath();
         ctx.moveTo(startX, startY + y * tileDim);
@@ -482,7 +557,7 @@ function drawMiniMap(ctx: CanvasRenderingContext2D, x: number, y: number, w: num
 
     for (let index = 0; index < rayAmount; ++index) {
 
-        const rayFactor: number = (index / rayAmount) * 2 - 1;
+        const rayFactor: number = (index / (rayAmount - 1)) * 2 - 1;
         const rayDir: Vector2 = playerDir.add(halfPlaneDir().scale(rayFactor)).norm();
         const hit = calculateNearIntersection(playerPos, rayDir);
 
@@ -503,9 +578,8 @@ function drawMiniMap(ctx: CanvasRenderingContext2D, x: number, y: number, w: num
             ctx.beginPath();
             ctx.arc(screenHitPos.x, screenHitPos.y, 2, 0, 2 * Math.PI);
             ctx.fill();
-
         }
-
+    
     }
     
     // Draw player    
@@ -513,15 +587,6 @@ function drawMiniMap(ctx: CanvasRenderingContext2D, x: number, y: number, w: num
     ctx.beginPath();
     ctx.arc(screenPlayerPos.x, screenPlayerPos.y, playerRad*tileDim, 0, 2 * Math.PI);
     ctx.fill();
-
-    // Draw player dir
-    const playerSreenDirPos = screenPlayerPos.add(playerDir.scale(tileDim));
-    ctx.strokeStyle = "yellow"
-    ctx.beginPath();
-    ctx.moveTo(screenPlayerPos.x, screenPlayerPos.y);
-    ctx.lineTo(playerSreenDirPos.x, playerSreenDirPos.y);
-    ctx.stroke();
-
     
     // Draw player vel
     const playerSreenVelPos = screenPlayerPos.add(playerVel.scale(tileDim));
@@ -610,15 +675,26 @@ function update(dt: number) {
         }
     }
     
-    playerPos = newPlayerPos;    
+    playerPos = newPlayerPos;
+
+    // NOTE: Update sprite animation
+    const timePerImage = spriteTextureSpeed / 5;
+    if(spriteTextureCurrentTime >= timePerImage) {
+        spriteTextureCurrentTime = 0;
+        spriteTextureIndex = (spriteTextureIndex + 1) % 5;
+    } else {
+        spriteTextureCurrentTime += dt;
+    }
+    
 }
 
 function draw(ctx: CanvasRenderingContext2D, backbuffer: Backbuffer) {
     backbuffer.clear(0xff774444);
     drawFloor(backbuffer);
     drawMap3d(backbuffer);
+    drawSprites(backbuffer);
     backbuffer.draw();
-
+    
     drawMiniMap(ctx, 0, 0, 200);
     
 }
