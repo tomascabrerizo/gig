@@ -101,7 +101,7 @@ const SPRITES: Vector2[] = [
 
 ]
 
-const downSampleFactor = 1 / 1;
+const downSampleFactor = 1 / 4;
 
 const SCREEN_WIDTH: number = 1920 / 2
 const SCREEN_HEIGHT: number = 1080 / 2
@@ -109,7 +109,7 @@ const SCREEN_HEIGHT: number = 1080 / 2
 const playerRad: number = 0.3;
 const playerSpeed: number = 3;
 const playerRotSpeed: number = 240;
-let playerPos: Vector2 = new Vector2(GRID_COLS/2 - 3, GRID_ROWS/2 - 1);
+let playerPos: Vector2 = new Vector2(GRID_COLS/2 - 2.5, GRID_ROWS/2 - 1);
 let playerDir: Vector2 = new Vector2(1, 0);
 let playerVel: Vector2 = new Vector2(0, 0);
 
@@ -428,8 +428,8 @@ function drawSprites(backbuffer: Backbuffer) {
             const t: number = c.sub(p0).dot(cameraPlaneNorm) / cameraPlaneLen;
             const z = a.dot(playerDir.norm());
             
-            const spriteDim = Math.floor(200 / z);
-            const y = Math.floor(backbuffer.height/2 - spriteDim / 2) + Math.floor(200/z);
+            const spriteDim = Math.floor((200 * downSampleFactor) / z);
+            const y = Math.floor(backbuffer.height/2 - spriteDim / 2) + spriteDim;
             const screenX = Math.floor(t * (backbuffer.width - 1));
             const startX = screenX - Math.floor(spriteDim / 2);
             const endX = screenX + Math.floor(spriteDim / 2);
@@ -699,7 +699,7 @@ function draw(ctx: CanvasRenderingContext2D, backbuffer: Backbuffer) {
     
 }
 
-(() => {
+window.onload = () => {
     
     const canvas = document.getElementById("canvas") as (HTMLCanvasElement | null);
     if (canvas === null) {
@@ -776,4 +776,4 @@ function draw(ctx: CanvasRenderingContext2D, backbuffer: Backbuffer) {
 
     requestAnimationFrame(loop);
     
-})();
+};
