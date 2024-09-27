@@ -1,67 +1,7 @@
 
-class Vector2 {
-    x: number;
-    y: number;
-
-    constructor(x: number, y: number) {
-        this.x = x;
-        this.y = y;
-    }
-
-    add(other: Vector2): Vector2 {
-        return new Vector2(this.x + other.x, this.y + other.y);
-    }
-
-    sub(other: Vector2): Vector2 {
-        return new Vector2(this.x - other.x, this.y - other.y);
-    }
-
-    scale(value: number): Vector2 {
-        return new Vector2(this.x * value, this.y * value);
-    }
-
-    length(): number {
-        return Math.sqrt(this.x * this.x + this.y * this.y);
-    }
-
-    norm(): Vector2 {
-        const length = this.length();
-        if (length === 0) return new Vector2(0, 0);
-        const invLength = 1.0 / length;
-        return new Vector2(this.x * invLength, this.y * invLength);
-    }
-
-    perp(): Vector2 {
-        return new Vector2(-this.y, this.x);
-    }
-
-    rotate(angle: number): Vector2 {
-        const rad = angle * Math.PI / 180;
-        return new Vector2(
-            this.x * Math.cos(rad) - this.y * Math.sin(rad),
-            this.x * Math.sin(rad) + this.y * Math.cos(rad),
-        );
-    }
-
-    dot(other: Vector2): number {
-        return this.x * other.x + this.y * other.y;
-    }
-
-    static lerp(a: Vector2, b: Vector2, t: number) {
-        return a.scale(1-t).add(b.scale(t));
-    }
-    
-    static angleBetween(a: Vector2, b: Vector2) {
-        return Math.acos(a.dot(b) / (a.length() * b.length()));
-    }
-
-};
-
-type Texture = {
-    pixels: Uint32Array,
-    width: number,
-    height: number,
-}
+import { Vector2 } from "./vector2.js"
+import { Display } from "./display.js"
+import { Backbuffer, Texture } from "./backbuffer.js"
 
 const MAP: Array<Array<number>> = [
     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -98,7 +38,6 @@ const SPRITES: Vector2[] = [
     new Vector2(GRID_COLS/2+1, GRID_ROWS/2),
     new Vector2(GRID_COLS/2, GRID_ROWS/2-1),
     new Vector2(GRID_COLS/2, GRID_ROWS/2+1),
-
 ]
 
 const BACKBUFFER_W = Math.floor(1920 / 8);
@@ -121,200 +60,30 @@ let spriteTextureIndex = 0;
 let spriteTextureSpeed = 0.7;
 let spriteTextureCurrentTime = 0;
 
-class Backbuffer {
-    display: HTMLCanvasElement;
-    ctx: CanvasRenderingContext2D;
-    imageData: ImageData;
-    imageDataCanvas: HTMLCanvasElement;
-    imageDataCanvasCtx: CanvasRenderingContext2D;
-    buffer: Uint32Array;
+async function loadTextures() {
+    for (let index = 0; index < document.images.length; index++) {
 
+        const texture: HTMLImageElement = document.images[index];
+
+        const canvas = new OffscreenCanvas(texture.width, texture.height);
+        const ctx = canvas.getContext("2d");
+        if (ctx === null) throw new Error("2d canvas is not supported");
+        ctx.drawImage(texture, 0, 0);
+
+        const textureData: ImageData = ctx.getImageData(0, 0, texture.width, texture.height);
+        const textureBuffer: ArrayBuffer = new ArrayBuffer(texture.width * texture.height * 4);
+        const textureBuffer32: Uint32Array = new Uint32Array(textureBuffer);
+        textureBuffer32.set(new Uint32Array(textureData.data.buffer));
+
+        const result = {
+            pixels: textureBuffer32,
+            width: texture.width,
+            height: texture.height
+        };
+        TEXTURES.push(result);
+    }
     
-    width: number;
-    height: number;
-
-    zBuffer: Array<number>;
-    
-    constructor(display: HTMLCanvasElement, width: number, height: number) {
-
-        // Initialize display
-        this.display = display;
-
-        const rect = this.display.getBoundingClientRect();        
-        this.display.width = rect.width;
-        this.display.height = rect.height;
-
-        window.addEventListener("resize", ()=> {
-            const rect = this.display.getBoundingClientRect();
-            this.display.width = rect.width;
-            this.display.height = rect.height;            
-        });
-        
-        const ctx = this.display.getContext("2d", { willReadFrequently: true }) as (CanvasRenderingContext2D | null);
-        if (ctx === null) {
-            throw new Error("2d context is not supported");
-        }
-        this.ctx = ctx;
-
-        // Initialize backbuffer
-        this.imageData = ctx.createImageData(width, height);
-        this.buffer = new Uint32Array(this.imageData.data.buffer);
-        this.width = width;
-        this.height = height;
-
-        this.zBuffer = new Array<number>(width);
-        this.zBuffer.fill(0);
-
-        this.imageDataCanvas = document.createElement("canvas");
-        this.imageDataCanvas.width  = BACKBUFFER_W;
-        this.imageDataCanvas.height = BACKBUFFER_W;
-        const imageDataCanvasCtx = this.imageDataCanvas.getContext("2d", { willReadFrequently: true }) as (CanvasRenderingContext2D | null);
-        if(imageDataCanvasCtx === null) {
-            throw new Error("2d context is not supported");
-        }
-        this.imageDataCanvasCtx = imageDataCanvasCtx;
-
-        const saveCanvasWidth = display.width;
-        const saveCanvasHeight = display.height;
-
-        for (let index = 0; index < document.images.length; index++) {
-
-            const texture: HTMLImageElement = document.images[index];
-
-            display.width = texture.width;
-            display.height = texture.height;
-            this.ctx.imageSmoothingEnabled = false;
-            this.ctx.drawImage(texture, 0, 0)
-            
-            const textureData: ImageData = this.ctx.getImageData(0, 0, texture.width, texture.height);
-            const textureBuffer: ArrayBuffer = new ArrayBuffer(texture.width * texture.height * 4);
-            const textureBuffer32: Uint32Array = new Uint32Array(textureBuffer);
-            textureBuffer32.set(new Uint32Array(textureData.data.buffer));
-
-            const result = {
-                pixels: textureBuffer32,
-                width: texture.width,
-                height: texture.height
-            };
-            TEXTURES.push(result);
-        }
-
-        display.width = saveCanvasWidth;
-        display.height = saveCanvasHeight;       
-    }
-
-    draw() {
-        this.imageDataCanvasCtx.imageSmoothingEnabled = false;
-        this.imageDataCanvasCtx.putImageData(this.imageData, 0, 0);
-        this.ctx.imageSmoothingEnabled = false;
-        this.ctx.drawImage(this.imageDataCanvas, 0, 0, this.width, this.height, 0, 0, this.display.width, this.display.height);
-    }
-
-    clear(color: number) {
-        this.buffer.fill(color);
-    }
-
-    drawRect(x: number, y: number, w: number, h: number, color: number) {
-        let minX = x;
-        let maxX = minX + (w - 1);
-        let minY = y;
-        let maxY = minY + (h - 1);
-
-        if (minX < 0) minX = 0;
-        if (maxX >= this.width) maxX = (this.width - 1);
-        if (minY < 0) minY = 0;
-        if (maxY >= this.height) maxY = (this.height - 1);
-
-        for (let offsetY: number = minY; offsetY <= maxY; ++offsetY) {
-            for (let offsetX: number = minX; offsetX <= maxX; ++offsetX) {
-                this.buffer[offsetY * this.width + offsetX] = color;
-            }
-        }
-    }
-
-    putTexture(texture: Texture) {
-        for (let y = 0; y < texture.height; ++y) {
-            for (let x = 0; x < texture.width; ++x) {
-                this.buffer[y * this.width + x] = texture.pixels[y * texture.width + x];
-            }
-        }
-    }
-
-    drawTexture(texture: Texture,
-        srcX: number, srcY: number, srcW: number, srcH: number,
-        desX: number, desY: number, desW: number, desH: number,
-                vertical?: boolean, fogColor?: number, fogT?: number) {
-
-        let minX = desX;
-        let maxX = minX + (desW - 1);
-        let minY = desY;
-        let maxY = minY + (desH - 1);
-
-        let offsetX: number = 0;
-        let offsetY: number = 0;
-
-        if (minX < 0) {
-            offsetX = -minX;
-            minX = 0;
-        }
-        if (maxX >= this.width) {
-            maxX = (this.width - 1);
-        }
-
-        if (minY < 0) {
-            offsetY = -minY;
-            minY = 0;
-        }
-        if (maxY >= this.height) {
-            maxY = (this.height - 1);
-        }
-
-        for (let y = minY; y <= maxY; ++y) {
-
-            const ty = ((y - minY) + offsetY) / desH;
-            for (let x = minX; x <= maxX; ++x) {
-                const tx = ((x - minX) + offsetX) / desW;
-
-                const srcOffsetX = srcX + Math.floor(tx * srcW);
-                const srcOffsetY = srcY + Math.floor(ty * srcH);
-                const desOffsetX = x;
-                const desOffsetY = y;
-                
-                let srcColor = texture.pixels[srcOffsetY * texture.width + srcOffsetX];
-
-                // TODO: add a flag to render textures using real alpha bending
-                const a = ((srcColor >> 24) & 0xff);
-                if(a < Math.floor(0xff/2)) continue;
-                
-                if (vertical === true) {
-                    const scale = 0.4;
-                    const r = ((srcColor >> 16) & 0xff) * scale;
-                    const g = ((srcColor >> 8) & 0xff) * scale;
-                    const b = ((srcColor >> 0) & 0xff) * scale;
-                    srcColor = (0xff << 24) | (r << 16) | (g << 8) | (b);
-                }
-
-                if(fogColor && fogT) {
-                    const dr = ((fogColor >> 16) & 0xff);
-                    const dg = ((fogColor >> 8) & 0xff);
-                    const db = ((fogColor >> 0) & 0xff);
-
-                    const sr = ((srcColor >> 16) & 0xff);
-                    const sg = ((srcColor >> 8) & 0xff);
-                    const sb = ((srcColor >> 0) & 0xff);
-
-                    const r = Math.floor(sr * (1-fogT) + dr * fogT);
-                    const g = Math.floor(sg * (1-fogT) + dg * fogT);
-                    const b = Math.floor(sb * (1-fogT) + db * fogT);
-                    
-                    srcColor = (0xff << 24) | (r << 16) | (g << 8) | (b);
-                }
-
-                this.buffer[desOffsetY * this.width + desOffsetX] = srcColor;
-            }
-        }
-    }
-};
+}
 
 type Hit = {
     result: boolean,
@@ -345,7 +114,6 @@ function calculateNearIntersection(pos: Vector2, dir: Vector2): Hit {
     } else {
         edgeX = pos.x;
     }
-    
 
     let edgeY: number;
     if (dy < 0) {
@@ -781,26 +549,19 @@ function update(dt: number) {
     const timePerImage = spriteTextureSpeed / 5;
     spriteTextureIndex = Math.floor(spriteTextureCurrentTime / timePerImage) % 5;
     spriteTextureCurrentTime += dt;
-    
-    // const timePerImage = spriteTextureSpeed / 5;
-    // if(spriteTextureCurrentTime >= timePerImage) {
-    //     spriteTextureCurrentTime = 0;
-    //     spriteTextureIndex = (spriteTextureIndex + 1) % 5;
-    // } else {
-    //     spriteTextureCurrentTime += dt;
-    // }
-    
 }
 
-function draw(backbuffer: Backbuffer) {
+function draw(display: Display, backbuffer: Backbuffer) {
+
     backbuffer.clear(0xff774444);
     drawFloor(backbuffer);
     drawMap3d(backbuffer);
     drawSprites(backbuffer);
     backbuffer.draw();
-    
-    //drawMiniMap(ctx, 0, 0, 200);
-    
+
+    display.draw(backbuffer);
+
+    // drawMiniMap(ctx, 0, 0, 200);
 }
 
 window.onload = () => {
@@ -816,10 +577,12 @@ window.onload = () => {
     }
     
     console.log("Welcome to my raycasting GAME!");
+    loadTextures();
     
     canvas.style.backgroundColor = "#444444";
 
-    const backbuffer = new Backbuffer(canvas, BACKBUFFER_W, BACKBUFFER_H);
+    const display = new Display();
+    const backbuffer = new Backbuffer(BACKBUFFER_W, BACKBUFFER_H);
     
     window.addEventListener("keydown", (event) => {
         if(event.key === "w") {
@@ -869,9 +632,8 @@ window.onload = () => {
 
         let dt: number = (currentTime - lastTime) / 1000;
         lastTime = currentTime;        
-
         update(dt);
-        draw(backbuffer);
+        draw(display, backbuffer);
 
         requestAnimationFrame(loop);
     };
