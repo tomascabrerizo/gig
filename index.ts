@@ -101,10 +101,8 @@ const SPRITES: Vector2[] = [
 
 ]
 
-const downSampleFactor = 1 / 4;
-
-const SCREEN_WIDTH: number = 1920 / 2
-const SCREEN_HEIGHT: number = 1080 / 2
+const BACKBUFFER_W = Math.floor(1920 / 8);
+const BACKBUFFER_H = Math.floor(1080 / 8)
 
 const playerRad: number = 0.3;
 const playerSpeed: number = 3;
@@ -124,9 +122,11 @@ let spriteTextureSpeed = 0.7;
 let spriteTextureCurrentTime = 0;
 
 class Backbuffer {
-    canvas: HTMLCanvasElement;
+    display: HTMLCanvasElement;
     ctx: CanvasRenderingContext2D;
     imageData: ImageData;
+    imageDataCanvas: HTMLCanvasElement;
+    imageDataCanvasCtx: CanvasRenderingContext2D;
     buffer: Uint32Array;
 
     
@@ -135,35 +135,57 @@ class Backbuffer {
 
     zBuffer: Array<number>;
     
-    constructor(canvas: HTMLCanvasElement, width: number, height: number) {
+    constructor(display: HTMLCanvasElement, width: number, height: number) {
 
-        this.canvas = canvas;
-        const ctx = canvas.getContext("2d", { willReadFrequently: true }) as (CanvasRenderingContext2D | null);
+        // Initialize display
+        this.display = display;
+
+        const rect = this.display.getBoundingClientRect();        
+        this.display.width = rect.width;
+        this.display.height = rect.height;
+
+        window.addEventListener("resize", ()=> {
+            const rect = this.display.getBoundingClientRect();
+            this.display.width = rect.width;
+            this.display.height = rect.height;            
+        });
+        
+        const ctx = this.display.getContext("2d", { willReadFrequently: true }) as (CanvasRenderingContext2D | null);
         if (ctx === null) {
             throw new Error("2d context is not supported");
         }
         this.ctx = ctx;
-        this.ctx.imageSmoothingEnabled = false;
 
-        this.imageData = ctx.getImageData(0, 0, width, height);
+        // Initialize backbuffer
+        this.imageData = ctx.createImageData(width, height);
         this.buffer = new Uint32Array(this.imageData.data.buffer);
         this.width = width;
         this.height = height;
 
-        this.zBuffer = new Array<number>(this.width);
+        this.zBuffer = new Array<number>(width);
         this.zBuffer.fill(0);
-        
-        const saveCanvasWidth = canvas.width;
-        const saveCanvasHeight = canvas.height;
+
+        this.imageDataCanvas = document.createElement("canvas");
+        this.imageDataCanvas.width  = BACKBUFFER_W;
+        this.imageDataCanvas.height = BACKBUFFER_W;
+        const imageDataCanvasCtx = this.imageDataCanvas.getContext("2d", { willReadFrequently: true }) as (CanvasRenderingContext2D | null);
+        if(imageDataCanvasCtx === null) {
+            throw new Error("2d context is not supported");
+        }
+        this.imageDataCanvasCtx = imageDataCanvasCtx;
+
+        const saveCanvasWidth = display.width;
+        const saveCanvasHeight = display.height;
 
         for (let index = 0; index < document.images.length; index++) {
 
             const texture: HTMLImageElement = document.images[index];
 
-            canvas.width = texture.width;
-            canvas.height = texture.height;
+            display.width = texture.width;
+            display.height = texture.height;
+            this.ctx.imageSmoothingEnabled = false;
             this.ctx.drawImage(texture, 0, 0)
-
+            
             const textureData: ImageData = this.ctx.getImageData(0, 0, texture.width, texture.height);
             const textureBuffer: ArrayBuffer = new ArrayBuffer(texture.width * texture.height * 4);
             const textureBuffer32: Uint32Array = new Uint32Array(textureBuffer);
@@ -177,14 +199,15 @@ class Backbuffer {
             TEXTURES.push(result);
         }
 
-        canvas.width = saveCanvasWidth;
-        canvas.height = saveCanvasHeight;
-        
+        display.width = saveCanvasWidth;
+        display.height = saveCanvasHeight;       
     }
 
     draw() {
-        this.ctx.putImageData(this.imageData, 0, 0);
-        this.ctx.drawImage(this.canvas, 0, 0, this.width, this.height, 0, 0, this.canvas.width, this.canvas.height);
+        this.imageDataCanvasCtx.imageSmoothingEnabled = false;
+        this.imageDataCanvasCtx.putImageData(this.imageData, 0, 0);
+        this.ctx.imageSmoothingEnabled = false;
+        this.ctx.drawImage(this.imageDataCanvas, 0, 0, this.width, this.height, 0, 0, this.display.width, this.display.height);
     }
 
     clear(color: number) {
@@ -503,8 +526,8 @@ function drawSprites(backbuffer: Backbuffer) {
             const t: number = c.sub(p0).dot(cameraPlaneNorm) / cameraPlaneLen;
             const z = a.dot(playerDir.norm());
             
-            const spriteDim = Math.floor((200 * downSampleFactor) / z);
-            const y = Math.floor(backbuffer.height/2 - spriteDim / 2) + spriteDim;
+            const spriteDim = Math.floor(backbuffer.height*0.25/z);
+            const y = Math.floor(backbuffer.height/2 - spriteDim / 2) + Math.floor((backbuffer.height/2) /z) - Math.floor(spriteDim/2);
             const screenX = Math.floor(t * (backbuffer.width - 1));
             const startX = screenX - Math.floor(spriteDim / 2);
             const endX = screenX + Math.floor(spriteDim / 2);
@@ -769,19 +792,14 @@ function update(dt: number) {
     
 }
 
-function draw(ctx: CanvasRenderingContext2D, backbuffer: Backbuffer) {
-    ctx.reset();
-    ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = "red";
-    ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-    
+function draw(backbuffer: Backbuffer) {
     backbuffer.clear(0xff774444);
     drawFloor(backbuffer);
     drawMap3d(backbuffer);
     drawSprites(backbuffer);
     backbuffer.draw();
     
-    drawMiniMap(ctx, 0, 0, 200);
+    //drawMiniMap(ctx, 0, 0, 200);
     
 }
 
@@ -799,11 +817,9 @@ window.onload = () => {
     
     console.log("Welcome to my raycasting GAME!");
     
-    canvas.width = SCREEN_WIDTH;
-    canvas.height = SCREEN_HEIGHT;
     canvas.style.backgroundColor = "#444444";
 
-    const backbuffer = new Backbuffer(canvas, Math.ceil(canvas.width*downSampleFactor), Math.ceil(canvas.height*downSampleFactor));
+    const backbuffer = new Backbuffer(canvas, BACKBUFFER_W, BACKBUFFER_H);
     
     window.addEventListener("keydown", (event) => {
         if(event.key === "w") {
@@ -855,7 +871,7 @@ window.onload = () => {
         lastTime = currentTime;        
 
         update(dt);
-        draw(ctx, backbuffer);
+        draw(backbuffer);
 
         requestAnimationFrame(loop);
     };
