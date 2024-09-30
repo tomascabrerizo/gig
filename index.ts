@@ -1,9 +1,9 @@
-
 import { Vector2 } from "./vector2.js"
 import { Display } from "./display.js"
 import { Backbuffer, Texture } from "./backbuffer.js"
 import { Map } from "./map.js"
 import { Render3d, Sprite, createCoin, createSprite } from "./render3d.js"
+import { DebugMinimap } from "./debug_minimap.js"
 
 const BACKBUFFER_W = Math.floor(1920 / 8);
 const BACKBUFFER_H = Math.floor(1080 / 8);
@@ -54,15 +54,10 @@ function loadTextures(): Texture[] {
     return textures;
 }
 
-
-function drawMiniMap(gs: GameState, r3d: Render3d, ctx: CanvasRenderingContext2D, x: number, y: number, w: number) {
+function drawMiniMap(gs: GameState) {
 
     const mapWidth = gs.map.getWidth();
     const mapHeight = gs.map.getHeight();
-    
-    const startX = x;
-    const startY = y;
-    const tileDim = w / mapWidth;
     
     // Draw tilemap
     for (let y = 0; y < mapHeight; ++y) {
@@ -70,96 +65,24 @@ function drawMiniMap(gs: GameState, r3d: Render3d, ctx: CanvasRenderingContext2D
             const textureIndex = gs.map.tiles[y][x] - 1;
             if (textureIndex >= 0) {
                 const texture: HTMLImageElement = document.images[textureIndex];
-                ctx.drawImage(texture, startX + x * tileDim, startY + y * tileDim, tileDim, tileDim);
+                DebugMinimap.getInstance().drawImage(new Vector2(x, y), new Vector2(1, 1), texture);
             } else {
                 const texture: HTMLImageElement = document.images[4];
-                ctx.drawImage(texture, startX + x * tileDim, startY + y * tileDim, tileDim, tileDim);
+                DebugMinimap.getInstance().drawImage(new Vector2(x, y), new Vector2(1, 1), texture);
             }
 
         }
     }
 
-    let newPlayerPos: Vector2 = gs.playerPos.add(gs.playerVel);
-
-    const cellX = Math.floor(gs.playerPos.x);
-    const cellY = Math.floor(gs.playerPos.y);
-    const targetCellX = Math.floor(newPlayerPos.x);
-    const targetCellY = Math.floor(newPlayerPos.y);
-
-    const offset = Math.ceil(gs.playerRad);
-    
-    const minX = Math.max(Math.min(cellX, targetCellX) - offset, 0);
-    const maxX = Math.min(Math.max(cellX, targetCellX) + offset, mapWidth-1);
-
-    const minY = Math.max(Math.min(cellY, targetCellY) - offset, 0);
-    const maxY = Math.min(Math.max(cellY, targetCellY) + offset, mapHeight-1);
-
-    ctx.fillStyle = "rgb(0, 0, 255, 0.3)"
-    ctx.fillRect(minX*tileDim, minY*tileDim, (maxX - minX + 1)*tileDim, (maxY - minY + 1)*tileDim)
-
     // Draw grid
-
-    ctx.strokeStyle = "rgba(0, 0, 0, 0.5)"
     for (let y = 0; y < mapHeight; ++y) {
-        ctx.beginPath();
-        ctx.moveTo(startX, startY + y * tileDim);
-        ctx.lineTo(startX + mapWidth * tileDim, startY + y * tileDim);
-        ctx.stroke();
+        DebugMinimap.getInstance().drawLine(new Vector2(0, y), new Vector2(mapWidth, y), 0.06, "rgba(64, 128, 255, 0.3)");
     }
 
     for (let x = 0; x < mapWidth; ++x) {
-        ctx.beginPath();
-        ctx.moveTo(startX + x * tileDim, startY);
-        ctx.lineTo(startX + x * tileDim, startY + mapHeight * tileDim);
-        ctx.stroke();
+        DebugMinimap.getInstance().drawLine(new Vector2(x, 0), new Vector2(x, mapHeight), 0.06, "rgba(64, 128, 255, 0.3)");
     }
-
-    const screenPlayerPos = new Vector2(startX, startY).add(gs.playerPos.scale(tileDim));
-
-    // Draw rays
-    const rayAmount = 20;
-
-    for (let index = 0; index < rayAmount; ++index) {
-
-        const rayFactor: number = (index / (rayAmount - 1)) * 2 - 1;
-        const rayDir: Vector2 = gs.playerDir.add(r3d.halfPlaneDir(gs).scale(rayFactor)).norm();
-        const hit = r3d.calculateNearIntersection(gs, gs.playerPos, rayDir);
-
-        if (hit.result === true) {
-            const hitDir: Vector2 = rayDir.scale(hit.t);
-            const hitPos: Vector2 = gs.playerPos.add(hitDir);
-            const screenHitPos: Vector2 = new Vector2(startX, startY).add(hitPos.scale(tileDim));
-
-            // Draw ray
-            ctx.strokeStyle = "yellow"
-            ctx.beginPath();
-            ctx.moveTo(screenPlayerPos.x, screenPlayerPos.y);
-            ctx.lineTo(screenHitPos.x, screenHitPos.y);
-            ctx.stroke();
-
-            // Draw hit position
-            ctx.fillStyle = "red";
-            ctx.beginPath();
-            ctx.arc(screenHitPos.x, screenHitPos.y, 2, 0, 2 * Math.PI);
-            ctx.fill();
-        }
-    
-    }
-    
-    // Draw player    
-    ctx.fillStyle = "green";
-    ctx.beginPath();
-    ctx.arc(screenPlayerPos.x, screenPlayerPos.y, gs.playerRad*tileDim, 0, 2 * Math.PI);
-    ctx.fill();
-    
-    // Draw player vel
-    const playerSreenVelPos = screenPlayerPos.add(gs.playerVel.scale(tileDim));
-    ctx.strokeStyle = "red"
-    ctx.beginPath();
-    ctx.moveTo(screenPlayerPos.x, screenPlayerPos.y);
-    ctx.lineTo(playerSreenVelPos.x, playerSreenVelPos.y);
-    ctx.stroke();
-    
+        
 }
 
 type Keyboard = {
@@ -218,6 +141,8 @@ function update(gs: GameState, dt: number) {
     const minY = Math.max(Math.min(cellY, targetCellY) - offset, 0);
     const maxY = Math.min(Math.max(cellY, targetCellY) + offset, gs.map.getHeight() - 1);
 
+    DebugMinimap.getInstance().drawRect(new Vector2(minX, minY), new Vector2((maxX - minX + 1), (maxY - minY + 1)), "rgb(0, 0, 255, 0.3)");
+    
     for (let y = minY; y <= maxY; ++y) {
         for (let x = minX; x <= maxX; ++x) {
 
@@ -240,7 +165,10 @@ function update(gs: GameState, dt: number) {
     }
     
     gs.playerPos = newPlayerPos;
-    
+
+    DebugMinimap.getInstance().drawCircle(gs.playerPos, gs.playerRad, "yellow");
+    DebugMinimap.getInstance().drawLine(gs.playerPos, gs.playerPos.add(gs.playerDir), 0.1, "red");
+        
     gs.sprites.forEach((sprite) => {
         if(sprite.textures.length <= 1) return;
         const timePerImage = sprite.speed / 5;
@@ -258,10 +186,13 @@ function draw(gs: GameState, r3d: Render3d, backbuffer: Backbuffer, display: Dis
     r3d.drawMap3d(gs, backbuffer);
     r3d.drawSprites(gs, backbuffer);
     backbuffer.draw();
-
     display.draw(backbuffer);
 
-    // drawMiniMap(ctx, 0, 0, 200);
+    // Draw the debug code
+    display.draw(DebugMinimap.getInstance().getCommands());
+    DebugMinimap.getInstance().clearCommands();
+    drawMiniMap(gs);
+      
 }
 
 window.onload = () => {
@@ -362,7 +293,7 @@ window.onload = () => {
         lastTime = currentTime;        
         update(gs, dt);
         draw(gs, r3d, backbuffer, display);
-
+        
         requestAnimationFrame(loop);
     };
 

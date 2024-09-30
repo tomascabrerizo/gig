@@ -1,4 +1,7 @@
 import { Backbuffer } from "./backbuffer.js"
+import { DrawCommand, DrawCommandCircle, DrawCommandLine, DrawCommandRect, DrawCommandTexture } from "./render2d.js";
+
+type DisplayDrawable = Backbuffer | DrawCommand[];
 
 export class Display {
     canvas: HTMLCanvasElement;
@@ -33,9 +36,45 @@ export class Display {
         this.height = rect.height;
     }
 
-    draw(backbuffer: Backbuffer) {
-        this.ctx.imageSmoothingEnabled = false;
-        this.ctx.drawImage(backbuffer.canvas, 0, 0, backbuffer.width, backbuffer.height, 0, 0, this.width, this.height);
-    }
+    draw(drawable: DisplayDrawable) {
 
+        if(drawable instanceof Backbuffer) {
+            const backbuffer: Backbuffer = drawable;
+            this.ctx.imageSmoothingEnabled = false;
+            this.ctx.drawImage(backbuffer.canvas, 0, 0, backbuffer.width, backbuffer.height, 0, 0, this.width, this.height);
+        } else {
+            const commands: DrawCommand[] = drawable;
+            commands.forEach(command => {
+                switch (command.type) {
+                    case "DrawCommandTexture": {
+                        const rect: DrawCommandTexture = command as DrawCommandTexture;
+                        this.ctx.drawImage(rect.texture, rect.pos.x, rect.pos.y, rect.size.x, rect.size.y);
+                    } break;
+                    case "DrawCommandRect": {
+                        const rect: DrawCommandRect = command as DrawCommandRect;
+                        this.ctx.fillStyle = rect.color;
+                        this.ctx.fillRect(rect.pos.x, rect.pos.y, rect.size.x, rect.size.y)
+                    } break;
+                    case "DrawCommandLine": {
+                        const line: DrawCommandLine = command as DrawCommandLine;
+                        this.ctx.strokeStyle = line.color;
+                        this.ctx.lineWidth = line.width;
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(line.p1.x, line.p1.y);
+                        this.ctx.lineTo(line.p2.x, line.p2.y);
+                        this.ctx.stroke();
+                    } break;
+                    case "DrawCommandCircle": {
+                        const circle: DrawCommandCircle = command as DrawCommandCircle;
+                        this.ctx.fillStyle = circle.color;
+                        this.ctx.beginPath();
+                        this.ctx.arc(circle.pos.x, circle.pos.y, circle.rad, 0, 2 * Math.PI);
+                        this.ctx.fill();
+                    } break;
+                };
+
+            });
+        }
+    }
+ 
 }
