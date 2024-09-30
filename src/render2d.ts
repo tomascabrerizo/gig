@@ -1,4 +1,4 @@
-import { Vector2 } from "./vector2";
+import { Vector2 } from "./vector2.js";
 
 export type DrawCommandCircle = {
     type: string;
