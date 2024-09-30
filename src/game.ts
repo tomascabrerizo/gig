@@ -67,8 +67,8 @@ export function update(gs: GameState, input: Input, dt: number) {
 
     const keyboard = input.keyboard;
     const mouse = input.mouse;
-
-    // gs.playerDir = gs.playerDir.rotate(mouse.relX * dt * 5);
+    
+    // gs.playerDir = gs.playerDir.rotate(mouse.relX * 20);
     // mouse.relX = 0;
     
     if(keyboard.keySpace === true) {

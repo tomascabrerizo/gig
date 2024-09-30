@@ -26,11 +26,11 @@ export class Display {
         this.ctx = contextResult;
         
         this.resize();
-        window.addEventListener("resize", (() => {
+        window.addEventListener("resize", () => {
             this.resize();
-        }).bind(this));
+        });
 
-        window.addEventListener("keydown", ( async (event: KeyboardEvent) =>{
+        window.addEventListener("keydown", async (event: KeyboardEvent) =>{
             if(event.key === "p") {
                 if(event.repeat) return;
 
@@ -40,18 +40,17 @@ export class Display {
                     document.exitPointerLock();
                 }
 
-                this.isPointerLockerd = !this.isPointerLockerd;
-                
+                this.isPointerLockerd = !this.isPointerLockerd;                
             }
-        }).bind(this));
+        });
 
         this.canvas.addEventListener("mousemove", (event: MouseEvent) => {
 
             input.mouse.x = event.clientX;
             input.mouse.y = event.clientY;
             
-            input.mouse.relX = event.movementX;
-            input.mouse.relY = event.movementY;
+            input.mouse.relX = (event.movementX / this.canvas.width);
+            input.mouse.relY = (event.movementY / this.canvas.height);
         });        
     }
 
