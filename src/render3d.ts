@@ -320,6 +320,4 @@ export class Render3d {
             }
         }
     }
-
-
 }

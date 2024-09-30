@@ -1,3 +1,4 @@
+import { input } from "./browser.js"
 import { Backbuffer } from "./backbuffer.js"
 import { DrawCommand, DrawCommandCircle, DrawCommandLine, DrawCommandRect, DrawCommandTexture } from "./render2d.js";
 
@@ -9,6 +10,8 @@ export class Display {
     width: number = 0;
     height: number = 0;
 
+    isPointerLockerd: boolean = false;
+    
     constructor() {
         const canvasResult = document.getElementById("canvas") as (HTMLCanvasElement | null);
         if (canvasResult === null) {
@@ -25,7 +28,31 @@ export class Display {
         this.resize();
         window.addEventListener("resize", (() => {
             this.resize();
-        }).bind(this));        
+        }).bind(this));
+
+        window.addEventListener("keydown", ( async (event: KeyboardEvent) =>{
+            if(event.key === "p") {
+                if(event.repeat) return;
+
+                if(!this.isPointerLockerd) {
+                    await this.canvas.requestPointerLock();                
+                } else {
+                    document.exitPointerLock();
+                }
+
+                this.isPointerLockerd = !this.isPointerLockerd;
+                
+            }
+        }).bind(this));
+
+        this.canvas.addEventListener("mousemove", (event: MouseEvent) => {
+
+            input.mouse.x = event.clientX;
+            input.mouse.y = event.clientY;
+            
+            input.mouse.relX = event.movementX;
+            input.mouse.relY = event.movementY;
+        });        
     }
 
     resize() {

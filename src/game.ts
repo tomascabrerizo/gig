@@ -1,10 +1,10 @@
 import { Vector2 } from "./vector2.js"
-import { Display } from "./display.js"
 import { Backbuffer, Texture } from "./backbuffer.js"
+import { DrawCommand } from "./render2d.js"
 import { Render3d, Sprite, createCoin, createSprite } from "./render3d.js"
 import { Map } from "./map.js"
 import { DebugMinimap } from "./debug_minimap.js"
-import { Keyboard, loadTextures } from "./browser.js"
+import { Input, loadTextures } from "./browser.js"
 
 export type GameState = {
     playerRad: number;
@@ -21,6 +21,9 @@ export type GameState = {
     textures: Texture[];
     sprites: Sprite[];
     map: Map;
+    drawCommands2d: DrawCommand[];
+    gunTextureIndex: number;
+
 }
 
 export function init(): GameState {
@@ -54,14 +57,28 @@ export function init(): GameState {
 
         ],
         map,
+        drawCommands2d: [],
+        gunTextureIndex: 15,
     };
     
 }
 
-export function update(gs: GameState, keyboard: Keyboard, dt: number) {
+export function update(gs: GameState, input: Input, dt: number) {
 
+    const keyboard = input.keyboard;
+    const mouse = input.mouse;
+
+    // gs.playerDir = gs.playerDir.rotate(mouse.relX * dt * 5);
+    // mouse.relX = 0;
+    
+    if(keyboard.keySpace === true) {
+        gs.gunTextureIndex = 16;
+    } else {
+        gs.gunTextureIndex = 15;
+    }
+    
     gs.playerVel = new Vector2(0, 0);
-
+    
     if (keyboard.keyW === true) {
         gs.playerVel = gs.playerVel.add(gs.playerDir.scale(1));
     }
@@ -88,7 +105,7 @@ export function update(gs: GameState, keyboard: Keyboard, dt: number) {
         gs.playerDir = gs.playerDir.rotate(gs.playerRotSpeed * dt);
         gs.playerVel = gs.playerVel.rotate(gs.playerRotSpeed * dt);
     }
-
+    
     let newPlayerPos: Vector2 = gs.playerPos.add(gs.playerVel);
 
     const cellX = Math.floor(gs.playerPos.x);
@@ -137,56 +154,20 @@ export function update(gs: GameState, keyboard: Keyboard, dt: number) {
         sprite.index = Math.floor(sprite.currentTime / timePerImage) % sprite.textures.length;
         sprite.currentTime += dt;
     });
-
-
 }
 
-export function draw(gs: GameState, r3d: Render3d, backbuffer: Backbuffer, display: Display) {
-
+export function draw(gs: GameState, r3d: Render3d, backbuffer: Backbuffer) {
     backbuffer.clear(0xff774444);
     r3d.drawFloor(gs, backbuffer);
     r3d.drawMap3d(gs, backbuffer);
     r3d.drawSprites(gs, backbuffer);
+    
+    let gunTexture = gs.textures[gs.gunTextureIndex];    
+    const screenGunW = 120;
+    const screenGunH = 50;
+    const screenGunX = Math.floor(backbuffer.width/2 - screenGunW/2);
+    const screenGunY = Math.floor(backbuffer.height - screenGunH);
+    backbuffer.drawTexture(gunTexture, 0, 0, gunTexture.width, gunTexture.height, screenGunX, screenGunY, screenGunW, screenGunH);
+
     backbuffer.draw();
-    display.draw(backbuffer);
-
-    // Draw the debug code
-    display.draw(DebugMinimap.getInstance().getCommands());
-    DebugMinimap.getInstance().clearCommands();
-    drawMiniMap(gs);
-      
 }
-
-// Debug stuff
-
-function drawMiniMap(gs: GameState) {
-
-    const mapWidth = gs.map.getWidth();
-    const mapHeight = gs.map.getHeight();
-
-    // Draw tilemap
-    for (let y = 0; y < mapHeight; ++y) {
-        for (let x = 0; x < mapWidth; ++x) {
-            const textureIndex = gs.map.tiles[y][x] - 1;
-            if (textureIndex >= 0) {
-                const texture: HTMLImageElement = document.images[textureIndex];
-                DebugMinimap.getInstance().drawImage(new Vector2(x, y), new Vector2(1, 1), texture);
-            } else {
-                const texture: HTMLImageElement = document.images[4];
-                DebugMinimap.getInstance().drawImage(new Vector2(x, y), new Vector2(1, 1), texture);
-            }
-
-        }
-    }
-
-    // Draw grid
-    for (let y = 0; y < mapHeight; ++y) {
-        DebugMinimap.getInstance().drawLine(new Vector2(0, y), new Vector2(mapWidth, y), 0.06, "rgba(64, 128, 255, 0.3)");
-    }
-
-    for (let x = 0; x < mapWidth; ++x) {
-        DebugMinimap.getInstance().drawLine(new Vector2(x, 0), new Vector2(x, mapHeight), 0.06, "rgba(64, 128, 255, 0.3)");
-    }
-
-}
-

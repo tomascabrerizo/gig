@@ -1,60 +1,94 @@
 import { Texture } from "./backbuffer.js"
 
-export type Keyboard = {
+type Mouse = {
+    x: number,
+    y: number,
+    relX: number,
+    relY: number,
+};
+
+type Keyboard = {
     keyW: boolean,
     keyS: boolean,
     keyA: boolean,
     keyD: boolean,
     keyRight: boolean,
     keyLeft: boolean,
+    keySpace: boolean,
 };
 
-let keyboard: Keyboard = { keyW: false, keyS: false, keyA: false, keyD: false,  keyRight: false, keyLeft: false};
+export type Input = {
+    mouse: Mouse,
+    keyboard: Keyboard,
+};
 
-window.addEventListener("keydown", (event) => {
+export const  input: Input = {
+    keyboard: { keyW: false, keyS: false, keyA: false, keyD: false,  keyRight: false, keyLeft: false, keySpace: false},
+    mouse: {x: 0, y: 0, relX: 0, relY: 0},
+};
+
+export const  lastInput: Input = {
+    keyboard: { keyW: false, keyS: false, keyA: false, keyD: false,  keyRight: false, keyLeft: false, keySpace: false},
+    mouse: {x: 0, y: 0, relX: 0, relY: 0},
+};
+
+
+window.addEventListener("keydown", (event: KeyboardEvent) => {
     if (event.key === "w") {
-        keyboard.keyW = true;
+        input.keyboard.keyW = true;
     }
     if (event.key === "s") {
-        keyboard.keyS = true;
+        input.keyboard.keyS = true;
     }
     if (event.key === "a") {
-        keyboard.keyA = true;
+        input.keyboard.keyA = true;
     }
     if (event.key === "d") {
-        keyboard.keyD = true;
+        input.keyboard.keyD = true;
     }
     if (event.key === "ArrowLeft") {
-        keyboard.keyLeft = true;
+        input.keyboard.keyLeft = true;
     }
     if (event.key == "ArrowRight") {
-        keyboard.keyRight = true;
+        input.keyboard.keyRight = true;
+    }
+    if (event.key == " ") {
+        input.keyboard.keySpace = true;
     }
 });
 
 window.addEventListener("keyup", (event) => {
     if (event.key === "w") {
-        keyboard.keyW = false;
+        input.keyboard.keyW = false;
     }
     if (event.key === "s") {
-        keyboard.keyS = false;
+        input.keyboard.keyS = false;
     }
     if (event.key === "a") {
-        keyboard.keyA = false;
+        input.keyboard.keyA = false;
     }
     if (event.key === "d") {
-        keyboard.keyD = false;
+        input.keyboard.keyD = false;
     }
     if (event.key === "ArrowLeft") {
-        keyboard.keyLeft = false;
+        input.keyboard.keyLeft = false;
     }
     if (event.key == "ArrowRight") {
-        keyboard.keyRight = false;
+        input.keyboard.keyRight = false;
+    }
+    if (event.key == " ") {
+        input.keyboard.keySpace = false;
     }
 });
 
-export function getInput(): Keyboard {
-    return keyboard;
+export function getInput(): Input {
+    // input.mouse.relX = input.mouse.x - lastInput.mouse.x;
+    // input.mouse.relY = input.mouse.y - lastInput.mouse.y;
+
+    // lastInput.mouse.x = input.mouse.x;
+    // lastInput.mouse.y = input.mouse.y;
+    
+    return input;
 }
 
 export function loadTextures(): Texture[] {
