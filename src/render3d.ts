@@ -1,7 +1,7 @@
 
 import { Vector2 } from "./vector2.js"
 import { Backbuffer, Texture } from "./backbuffer.js"
-import { GameState } from "./index.js"
+import { GameState } from "./game.js"
 
 export type Sprite = {
     pos: Vector2;
@@ -209,14 +209,7 @@ export class Render3d {
         }
     }
 
-    drawSprites(gs: GameState, backbuffer: Backbuffer) {
-
-        // Sort srites
-        gs.sprites.sort((a, b) => {
-            const distanceToA = gs.playerPos.sub(a.pos).length();
-            const distanceToB = gs.playerPos.sub(b.pos).length();
-            return distanceToB - distanceToA;
-        });
+    drawSprite(gs: GameState, sprite: Sprite, backbuffer: Backbuffer) {
 
         // Draw sprites
         const halfCameraPlane = this.halfPlaneDir(gs);
@@ -229,52 +222,63 @@ export class Render3d {
         const near = gs.playerDir.norm().scale(gs.cameraNear);
         const nearLen = near.length();
 
-        gs.sprites.forEach((sprite) => {
+        
+        const spriteTexture = sprite.textures[sprite.index];
+        const spritePos: Vector2 = sprite.pos;
 
-            const spriteTexture = sprite.textures[sprite.index];
-            const spritePos: Vector2 = sprite.pos;
+        const a = spritePos.sub(gs.playerPos);
+        const aLen = a.length();
 
-            const a = spritePos.sub(gs.playerPos);
-            const aLen = a.length();
+        const denom = a.dot(near);
+        if (denom > 0) {
 
-            const denom = a.dot(near);
-            if (denom > 0) {
+            const cLen: number = (aLen * nearLen * nearLen) / denom;
+            const c = a.norm().scale(cLen);
 
-                const cLen: number = (aLen * nearLen * nearLen) / denom;
-                const c = a.norm().scale(cLen);
+            const t: number = c.sub(p0).dot(cameraPlaneNorm) / cameraPlaneLen;
+            const z = a.dot(gs.playerDir.norm());
 
-                const t: number = c.sub(p0).dot(cameraPlaneNorm) / cameraPlaneLen;
-                const z = a.dot(gs.playerDir.norm());
-                
-                const spriteDim = Math.floor(backbuffer.height * sprite.dim / z);
-                const worldHeight = backbuffer.height / z;
+            const spriteDim = Math.floor(backbuffer.height * sprite.dim / z);
+            const worldHeight = backbuffer.height / z;
 
-                const height = sprite.height * 2 - 1;
-                const y = Math.floor(backbuffer.height/2 - spriteDim/2) - Math.floor((worldHeight/2 - spriteDim/2) * height);
-                
-                const screenX = Math.floor(t * backbuffer.width);
-                const startX = screenX - Math.floor(spriteDim / 2);
-                const endX = screenX + Math.floor(spriteDim / 2);
-                
-                for (let index = startX; index <= endX; ++index) {
+            const height = sprite.height * 2 - 1;
+            const y = Math.floor(backbuffer.height / 2 - spriteDim / 2) - Math.floor((worldHeight / 2 - spriteDim / 2) * height);
 
-                    if (index < 0 || index >= backbuffer.width) continue;
-                    if (z >= backbuffer.zBuffer[index]) continue;
+            const screenX = Math.floor(t * backbuffer.width);
+            const startX = screenX - Math.floor(spriteDim / 2);
+            const endX = screenX + Math.floor(spriteDim / 2);
 
-                    const samplePosX = (index - startX) / (endX - startX + 1);
+            for (let index = startX; index <= endX; ++index) {
 
-                    const srcX = Math.floor((samplePosX * spriteTexture.width));
-                    const srcY = 0;
-                    const srcW = 1;
-                    const srcH = spriteTexture.height;
+                if (index < 0 || index >= backbuffer.width) continue;
+                if (z >= backbuffer.zBuffer[index]) continue;
 
-                    const fog = this.calculateFog(gs, z);
+                const samplePosX = (index - startX) / (endX - startX + 1);
 
-                    backbuffer.drawTexture(spriteTexture, srcX, srcY, srcW, srcH, index, y, 1, spriteDim, false, fog.color, fog.t);
+                const srcX = Math.floor((samplePosX * spriteTexture.width));
+                const srcY = 0;
+                const srcW = 1;
+                const srcH = spriteTexture.height;
 
-                }
+                const fog = this.calculateFog(gs, z);
 
+                backbuffer.drawTexture(spriteTexture, srcX, srcY, srcW, srcH, index, y, 1, spriteDim, false, fog.color, fog.t);
             }
+
+        }
+
+    }
+    
+    drawSprites(gs: GameState, backbuffer: Backbuffer) {
+
+        gs.sprites.sort((a, b) => {
+            const distanceToA = gs.playerPos.sub(a.pos).length();
+            const distanceToB = gs.playerPos.sub(b.pos).length();
+            return distanceToB - distanceToA;
+        });
+
+        gs.sprites.forEach((sprite) => {
+            this.drawSprite(gs, sprite, backbuffer);
         });
 
     }
