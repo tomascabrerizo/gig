@@ -1,4 +1,5 @@
 import { Texture } from "./backbuffer.js"
+import { mouseMovement } from "./display.js"
 
 type Mouse = {
     x: number,
@@ -82,11 +83,17 @@ window.addEventListener("keyup", (event) => {
 });
 
 export function getInput(): Input {
-    // input.mouse.relX = input.mouse.x - lastInput.mouse.x;
-    // input.mouse.relY = input.mouse.y - lastInput.mouse.y;
+    let movementX = 0;
+    let movementY = 0;
 
-    // lastInput.mouse.x = input.mouse.x;
-    // lastInput.mouse.y = input.mouse.y;
+    mouseMovement.forEach((move) => {
+        movementX += move.x;
+        movementY += move.y;
+    })
+    mouseMovement.length = 0;
+
+    input.mouse.relX = movementX;
+    input.mouse.relY = movementY;
     
     return input;
 }

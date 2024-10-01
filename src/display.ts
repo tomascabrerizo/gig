@@ -1,8 +1,10 @@
-import { input } from "./browser.js"
 import { Backbuffer } from "./backbuffer.js"
 import { DrawCommand, DrawCommandCircle, DrawCommandLine, DrawCommandRect, DrawCommandTexture } from "./render2d.js";
+import { Vector2 } from "./vector2.js";
 
 type DisplayDrawable = Backbuffer | DrawCommand[];
+
+export const mouseMovement: Vector2[] = [];
 
 export class Display {
     canvas: HTMLCanvasElement;
@@ -10,8 +12,6 @@ export class Display {
     width: number = 0;
     height: number = 0;
 
-    isPointerLockerd: boolean = false;
-    
     constructor() {
         const canvasResult = document.getElementById("canvas") as (HTMLCanvasElement | null);
         if (canvasResult === null) {
@@ -30,28 +30,36 @@ export class Display {
             this.resize();
         });
 
-        window.addEventListener("keydown", async (event: KeyboardEvent) =>{
-            if(event.key === "p") {
-                if(event.repeat) return;
-
-                if(!this.isPointerLockerd) {
-                    await this.canvas.requestPointerLock();                
-                } else {
-                    document.exitPointerLock();
+        this.canvas.addEventListener("click", async () => {
+            if (!document.pointerLockElement) {
+                try {
+                    await this.canvas.requestPointerLock({
+                        unadjustedMovement: true,
+                    });
+                } catch (error: any) {
+                    if (error.name === "NotSupportedError") {
+                        await this.canvas.requestPointerLock();
+                    } else {
+                        throw error;
+                    }
                 }
-
-                this.isPointerLockerd = !this.isPointerLockerd;                
             }
         });
 
-        this.canvas.addEventListener("mousemove", (event: MouseEvent) => {
+        document.addEventListener("pointerlockchange", () => {
+            if (document.pointerLockElement === this.canvas) {
+                console.log("The pointer lock status is now locked");
+                document.addEventListener("mousemove", updateMouse, false);
+            } else {
+                console.log("The pointer lock status is now unlocked");
+                document.removeEventListener("mousemove", updateMouse, false);
+            }
+        }, false);
 
-            input.mouse.x = event.clientX;
-            input.mouse.y = event.clientY;
-            
-            input.mouse.relX = (event.movementX / this.canvas.width);
-            input.mouse.relY = (event.movementY / this.canvas.height);
-        });        
+        const updateMouse = (event: MouseEvent) => {
+            mouseMovement.push(new Vector2(event.movementX, event.movementY));
+        };
+        
     }
 
     resize() {

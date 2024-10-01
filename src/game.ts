@@ -67,9 +67,9 @@ export function update(gs: GameState, input: Input, dt: number) {
 
     const keyboard = input.keyboard;
     const mouse = input.mouse;
+    const sensitivity = 0.1;
     
-    // gs.playerDir = gs.playerDir.rotate(mouse.relX * 20);
-    // mouse.relX = 0;
+    gs.playerDir = gs.playerDir.rotate(mouse.relX*sensitivity);
     
     if(keyboard.keySpace === true) {
         gs.gunTextureIndex = 16;

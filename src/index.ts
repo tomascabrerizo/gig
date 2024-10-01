@@ -34,8 +34,9 @@ window.onload = () => {
         // Blit the debug stuff
         display.draw(DebugMinimap.getInstance().getCommands());
         DebugMinimap.getInstance().clearCommands();
-        
-        requestAnimationFrame(loop);
+
+        requestAnimationFrame(loop);        
+        //setTimeout(() => requestAnimationFrame(loop), 16);
     };
 
     requestAnimationFrame(loop);
