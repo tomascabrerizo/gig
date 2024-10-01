@@ -1,22 +1,33 @@
 <html>
 
   <head>
-    <title>Gig</title>
+		<style>
+
+			body {
+					background-color: #222222;
+			}
+			
+			canvas {
+
+					width: 100vw;
+					height: auto;
+
+					max-width: calc(100vh * calc(16 / 9));
+					max-height: 100vh;
+					
+					aspect-ratio: calc(16/9);
+					position: absolute;
+					left: 50%; top: 50%;
+					transform: translate(-50%, -50%);
+			}
+			
+		</style>
+
+		<title>Gig</title>
   </head>
 
-  <body
-    style="background-color: #222222;"
-    >
-    <canvas
-      id="canvas"
-      style="
-						 width: 100vw;
-						 aspect-ratio: calc(16/9);
-						 position: absolute;
-						 left: 50%; top: 50%;
-						 transform: translate(-50%, -50%);"
-      >
-    </canvas>
+  <body>
+    <canvas id="canvas"></canvas>
 
     <img style="display: none;" src="./assets/box1.jpg"></img>
     <img style="display: none;" src="./assets/box2.jpg"></img>
