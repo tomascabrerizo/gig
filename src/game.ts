@@ -161,10 +161,11 @@ export function draw(gs: GameState, r3d: Render3d, backbuffer: Backbuffer) {
     r3d.drawFloor(gs, backbuffer);
     r3d.drawMap3d(gs, backbuffer);
     r3d.drawSprites(gs, backbuffer);
-    
+
+    let gunAspect = 201/80;
     let gunTexture = gs.textures[gs.gunTextureIndex];    
-    const screenGunW = 120;
-    const screenGunH = 50;
+    const screenGunH = Math.floor(backbuffer.height*0.35);
+    const screenGunW = Math.floor(screenGunH * gunAspect);
     const screenGunX = Math.floor(backbuffer.width/2 - screenGunW/2);
     const screenGunY = Math.floor(backbuffer.height - screenGunH);
     backbuffer.drawTexture(gunTexture, 0, 0, gunTexture.width, gunTexture.height, screenGunX, screenGunY, screenGunW, screenGunH);
