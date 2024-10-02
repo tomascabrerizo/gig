@@ -1,4 +1,3 @@
-import { Texture } from "./backbuffer.js"
 import { mouseMovement } from "./display.js"
 
 type Mouse = {
@@ -98,31 +97,31 @@ export function getInput(): Input {
     return input;
 }
 
-export function loadTextures(): Texture[] {
-    const textures: Texture[] = [];
+// export function loadTextures(): Texture[] {
+//     const textures: Texture[] = [];
     
-    for (let index = 0; index < document.images.length; index++) {
+//     for (let index = 0; index < document.images.length; index++) {
 
-        const texture: HTMLImageElement = document.images[index];
+//         const texture: HTMLImageElement = document.images[index];
 
-        const canvas = new OffscreenCanvas(texture.width, texture.height);
-        const ctx = canvas.getContext("2d");
-        if (ctx === null) throw new Error("2d canvas is not supported");
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(texture, 0, 0);
+//         const canvas = new OffscreenCanvas(texture.width, texture.height);
+//         const ctx = canvas.getContext("2d");
+//         if (ctx === null) throw new Error("2d canvas is not supported");
+//         ctx.imageSmoothingEnabled = false;
+//         ctx.drawImage(texture, 0, 0);
 
-        const textureData: ImageData = ctx.getImageData(0, 0, texture.width, texture.height);
-        const textureBuffer: ArrayBuffer = new ArrayBuffer(texture.width * texture.height * 4);
-        const textureBuffer32: Uint32Array = new Uint32Array(textureBuffer);
-        textureBuffer32.set(new Uint32Array(textureData.data.buffer));
+//         const textureData: ImageData = ctx.getImageData(0, 0, texture.width, texture.height);
+//         const textureBuffer: ArrayBuffer = new ArrayBuffer(texture.width * texture.height * 4);
+//         const textureBuffer32: Uint32Array = new Uint32Array(textureBuffer);
+//         textureBuffer32.set(new Uint32Array(textureData.data.buffer));
 
-        const result = {
-            pixels: textureBuffer32,
-            width: texture.width,
-            height: texture.height
-        };
-        textures.push(result);
-    }
+//         const result = {
+//             pixels: textureBuffer32,
+//             width: texture.width,
+//             height: texture.height
+//         };
+//         textures.push(result);
+//     }
 
-    return textures;
-}
+//     return textures;
+// }

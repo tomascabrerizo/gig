@@ -1,11 +1,12 @@
 
 import { Vector2 } from "./vector2.js"
-import { Backbuffer, Texture } from "./backbuffer.js"
+import { Backbuffer } from "./backbuffer.js"
 import { GameState } from "./game.js"
+import { AssetManager, AssetHandle, Texture } from "./assets.js"
 
 export type Sprite = {
     pos: Vector2;
-    textures: Texture[];
+    textures: AssetHandle[];
     dim: number;
     height: number;
     
@@ -14,7 +15,7 @@ export type Sprite = {
     currentTime: number;
 };
 
-export function createSprite(pos: Vector2, texture: Texture, dim: number, height: number): Sprite {
+export function createSprite(pos: Vector2, texture: AssetHandle, dim: number, height: number): Sprite {
     const result = {
         pos,
         textures: [texture],
@@ -27,10 +28,17 @@ export function createSprite(pos: Vector2, texture: Texture, dim: number, height
     return result;
 }
 
-export function createCoin(pos: Vector2, textures: Texture[]): Sprite {
+export function createCoin(pos: Vector2): Sprite {
     const result = {
         pos,
-        textures: textures.slice(6, 10),
+        textures: [
+            AssetManager.getInstance().get("./assets/Coin1.png"),
+            AssetManager.getInstance().get("./assets/Coin2.png"),
+            AssetManager.getInstance().get("./assets/Coin3.png"),
+            AssetManager.getInstance().get("./assets/Coin4.png"),
+            AssetManager.getInstance().get("./assets/Coin5.png"),
+            AssetManager.getInstance().get("./assets/Coin6.png"),
+        ],
         dim: 0.3,
         height: 0,
         index: 0,
@@ -43,7 +51,7 @@ export function createCoin(pos: Vector2, textures: Texture[]): Sprite {
 type Hit = {
     result: boolean,
     t: number,
-    texture: (Texture | undefined),
+    texture: AssetHandle,
     isVertical: boolean,
 };
 
@@ -110,12 +118,12 @@ export class Render3d {
             }
 
             if (mapY < 0 || mapY >= gs.map.getHeight() || mapX < 0 || mapX >= gs.map.getWidth()) {
-                return { result: false, t: 0, texture: gs.textures[0], isVertical: false };
+                return { result: false, t: 0, texture: gs.map.getTexture(0), isVertical: false };
             }
 
             const mapIndex = gs.map.tiles[mapY][mapX];
             if (mapIndex !== undefined && mapIndex !== 0) {
-                return { result: true, t, texture: gs.textures[mapIndex - 1], isVertical };
+                return { result: true, t, texture: gs.map.getTexture(mapIndex - 1), isVertical };
             }
         }
     }
@@ -145,8 +153,11 @@ export class Render3d {
         const p1: Vector2 = gs.playerDir.sub(this.halfPlaneDir(gs));
         const p2: Vector2 = gs.playerDir.add(this.halfPlaneDir(gs));
 
-        const floorTexture: Texture = gs.textures[4];
-        const ceilTexture: Texture = gs.textures[4];
+        const floorTextureHandle: AssetHandle = AssetManager.getInstance().get("./assets/floor.jpg");
+        const floorTexture: Texture = AssetManager.getInstance().getTexture(floorTextureHandle);
+
+        const ceilTextureHandle: AssetHandle = AssetManager.getInstance().get("./assets/floor.jpg");
+        const ceilTexture: Texture = AssetManager.getInstance().getTexture(ceilTextureHandle);
 
         for (let y = yStart; y < backbuffer.height; ++y) {
             const posY = cameraPosY - y;
@@ -223,7 +234,8 @@ export class Render3d {
         const nearLen = near.length();
 
         
-        const spriteTexture = sprite.textures[sprite.index];
+        const spriteTexture = AssetManager.getInstance().getTexture(sprite.textures[sprite.index]);
+
         const spritePos: Vector2 = sprite.pos;
 
         const a = spritePos.sub(gs.playerPos);
@@ -292,8 +304,10 @@ export class Render3d {
             const rayDir: Vector2 = gs.playerDir.add(this.halfPlaneDir(gs).scale(rayFactor)).norm();
             const hit = this.calculateNearIntersection(gs, gs.playerPos, rayDir);
 
-            if (hit.result === true && hit.texture !== undefined) {
+            if (hit.result === true) {
 
+                const texture = AssetManager.getInstance().getTexture(hit.texture);
+                
                 const hitDir: Vector2 = rayDir.scale(hit.t);
                 const hitPos: Vector2 = gs.playerPos.add(hitDir);
                 const z = hitDir.dot(gs.playerDir.norm());
@@ -311,12 +325,12 @@ export class Render3d {
                     samplePosX = hitPos.y - Math.floor(hitPos.y);
                 }
 
-                const srcX = Math.floor(samplePosX * hit.texture.width);
+                const srcX = Math.floor(samplePosX * texture.width);
                 const srcY = 0;
                 const srcW = 1;
-                const srcH = hit.texture.height;
+                const srcH = texture.height;
                 const fog = this.calculateFog(gs, z);
-                backbuffer.drawTexture(hit.texture, srcX, srcY, srcW, srcH, index, y, 1, height, hit.isVertical, fog.color, fog.t);
+                backbuffer.drawTexture(texture, srcX, srcY, srcW, srcH, index, y, 1, height, hit.isVertical, fog.color, fog.t);
             }
         }
     }

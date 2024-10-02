@@ -1,8 +1,4 @@
-export type Texture = {
-    pixels: Uint32Array,
-    width: number,
-    height: number,
-}
+import { Texture } from "./assets.js"
 
 export class Backbuffer {
     imageData: ImageData;

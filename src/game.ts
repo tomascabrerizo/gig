@@ -1,10 +1,11 @@
 import { Vector2 } from "./vector2.js"
-import { Backbuffer, Texture } from "./backbuffer.js"
+import { Backbuffer } from "./backbuffer.js"
 import { DrawCommand } from "./render2d.js"
 import { Render3d, Sprite, createCoin, createSprite } from "./render3d.js"
 import { Map } from "./map.js"
 import { DebugMinimap } from "./debug_minimap.js"
-import { Input, loadTextures } from "./browser.js"
+import { Input } from "./browser.js"
+import { AssetManager } from "./assets.js"
 
 export type GameState = {
     playerRad: number;
@@ -18,7 +19,6 @@ export type GameState = {
     cameraNear: number;
     cameraFar: number;
 
-    textures: Texture[];
     sprites: Sprite[];
     map: Map;
     drawCommands2d: DrawCommand[];
@@ -28,7 +28,6 @@ export type GameState = {
 
 export function init(): GameState {
     const map = new Map();
-    const textures: Texture[] = loadTextures();
 
     return {
         playerRad: 0.3,
@@ -42,18 +41,28 @@ export function init(): GameState {
         cameraNear: 1,
         cameraFar: 7,
 
-        textures,
         sprites: [
-            createCoin(new Vector2(1.5, 1.5), textures),
-            createCoin(new Vector2(2.5, 1.5), textures),
-            createCoin(new Vector2(3.5, 1.5), textures),
-            createCoin(new Vector2(4.5, 1.5), textures),
+            createCoin(new Vector2(1.5, 1.5)),
+            createCoin(new Vector2(2.5, 1.5)),
+            createCoin(new Vector2(3.5, 1.5)),
+            createCoin(new Vector2(4.5, 1.5)),
 
-            createSprite(new Vector2(map.getWidth() / 2, map.getHeight() / 2), textures[11], 0.5, 0),
-            createSprite(new Vector2(map.getWidth() / 2, map.getHeight() / 2 + 1), textures[12], 0.5, 0),
-            createSprite(new Vector2(map.getWidth() / 2, map.getHeight() / 2 - 1), textures[13], 0.5, 0),
-
-            createSprite(new Vector2(map.getWidth() - 3, map.getHeight() - 3), textures[14], 1, 0.5),
+            createSprite(
+                new Vector2(map.getWidth() / 2, map.getHeight() / 2),
+                AssetManager.getInstance().get("./assets/pika.png"),
+                0.5, 0),
+            createSprite(
+                new Vector2(map.getWidth() / 2, map.getHeight() / 2 + 1),
+                AssetManager.getInstance().get("./assets/bulb.png"),
+                0.5, 0),
+            createSprite(
+                new Vector2(map.getWidth() / 2, map.getHeight() / 2 - 1),
+                AssetManager.getInstance().get("./assets/char.png"),
+                0.5, 0),
+            createSprite(
+                new Vector2(map.getWidth() - 3, map.getHeight() - 3),
+                AssetManager.getInstance().get("./assets/charizard.png"),
+                1, 0.5),
 
         ],
         map,
@@ -163,7 +172,8 @@ export function draw(gs: GameState, r3d: Render3d, backbuffer: Backbuffer) {
     r3d.drawSprites(gs, backbuffer);
 
     let gunAspect = 201/80;
-    let gunTexture = gs.textures[gs.gunTextureIndex];    
+    let gunTextureHandle = AssetManager.getInstance().get("./assets/gun02.png");    
+    let gunTexture = AssetManager.getInstance().getTexture(gunTextureHandle);
     const screenGunH = Math.floor(backbuffer.height*0.35);
     const screenGunW = Math.floor(screenGunH * gunAspect);
     const screenGunX = Math.floor(backbuffer.width/2 - screenGunW/2);

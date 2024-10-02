@@ -5,12 +5,15 @@ import { Render3d } from "./render3d.js"
 import { getInput } from "./browser.js"
 import { init, update, draw, GameState } from "./game.js"
 import { DebugMinimap } from "./debug_minimap.js"
+import { AssetHandle, AssetManager, Texture } from "./assets.js"
 
 
 const BACKBUFFER_W = Math.floor(1920 / 8);
 const BACKBUFFER_H = Math.floor(1080 / 8);
 
-window.onload = () => {
+window.onload = async () => {
+
+    await AssetManager.init();
     
     const display = new Display();
     const backbuffer = new Backbuffer(BACKBUFFER_W, BACKBUFFER_H);
@@ -53,11 +56,13 @@ function drawMiniMap(gs: GameState) {
         for (let x = 0; x < mapWidth; ++x) {
             const textureIndex = gs.map.tiles[y][x] - 1;
             if (textureIndex >= 0) {
-                const texture: HTMLImageElement = document.images[textureIndex];
-                DebugMinimap.getInstance().drawImage(new Vector2(x, y), new Vector2(1, 1), texture);
+                const textureHandle = gs.map.getTexture(textureIndex);
+                const texture = AssetManager.getInstance().getTexture(textureHandle);
+                DebugMinimap.getInstance().drawImage(new Vector2(x, y), new Vector2(1, 1), texture.image);
             } else {
-                const texture: HTMLImageElement = document.images[4];
-                DebugMinimap.getInstance().drawImage(new Vector2(x, y), new Vector2(1, 1), texture);
+                const textureHandle: AssetHandle = AssetManager.getInstance().get("./assets/floor.jpg")
+                const texture = AssetManager.getInstance().getTexture(textureHandle);
+                DebugMinimap.getInstance().drawImage(new Vector2(x, y), new Vector2(1, 1), texture.image);
             }
 
         }
