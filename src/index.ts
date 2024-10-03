@@ -5,7 +5,7 @@ import { Render3d } from "./render3d.js"
 import { getInput } from "./browser.js"
 import { init, update, draw, GameState } from "./game.js"
 import { DebugMinimap } from "./debug_minimap.js"
-import { AssetHandle, AssetManager, Texture } from "./assets.js"
+import { AssetHandle, AssetManager } from "./assets.js"
 
 
 const BACKBUFFER_W = Math.floor(1920 / 8);
@@ -37,7 +37,7 @@ window.onload = async () => {
         // Blit the debug stuff
         display.draw(DebugMinimap.getInstance().getCommands());
         DebugMinimap.getInstance().clearCommands();
-
+        
         requestAnimationFrame(loop);        
         //setTimeout(() => requestAnimationFrame(loop), 16);
     };

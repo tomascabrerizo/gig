@@ -1,7 +1,7 @@
 import { Vector2 } from "./vector2.js"
 import { Backbuffer } from "./backbuffer.js"
 import { DrawCommand } from "./render2d.js"
-import { Render3d, Sprite, createCoin, createSprite } from "./render3d.js"
+import { Render3d, Sprite, Light, createSprite, createCoin } from "./render3d.js"
 import { Map } from "./map.js"
 import { DebugMinimap } from "./debug_minimap.js"
 import { Input } from "./browser.js"
@@ -24,6 +24,8 @@ export type GameState = {
     drawCommands2d: DrawCommand[];
     gunTextureIndex: number;
 
+    lights: Light[];
+    ambient: number;
 }
 
 export function init(): GameState {
@@ -68,6 +70,35 @@ export function init(): GameState {
         map,
         drawCommands2d: [],
         gunTextureIndex: 15,
+        lights: [
+            {
+                pos: new Vector2(map.getWidth() / 2, map.getHeight() / 2),
+                strength: 6,
+                color: 0x00ffff,
+            },
+            {
+                pos: new Vector2(0, 0),
+                strength: 2,
+                color: 0xff0000,
+            },
+            {
+                pos: new Vector2(map.getWidth()-2, 2),
+                strength: 2,
+                color: 0x00ff00,
+            },
+            {
+                pos: new Vector2(2, map.getHeight()-2),
+                strength: 2,
+                color: 0x0000ff,
+            },
+            {
+                pos: new Vector2(map.getWidth()-2, map.getHeight()-2),
+                strength: 2,
+                color: 0xff00ff,
+            }
+
+        ],
+        ambient: 0xffffff,
     };
     
 }
@@ -153,7 +184,8 @@ export function update(gs: GameState, input: Input, dt: number) {
     }
 
     gs.playerPos = newPlayerPos;
-
+    // gs.lights[0].pos = newPlayerPos;
+    
     DebugMinimap.getInstance().drawCircle(gs.playerPos, gs.playerRad, "yellow");
     DebugMinimap.getInstance().drawLine(gs.playerPos, gs.playerPos.add(gs.playerDir), 0.1, "red");
 
@@ -168,7 +200,7 @@ export function update(gs: GameState, input: Input, dt: number) {
 export function draw(gs: GameState, r3d: Render3d, backbuffer: Backbuffer) {
     backbuffer.clear(0xff774444);
     r3d.drawFloor(gs, backbuffer);
-    r3d.drawMap3d(gs, backbuffer);
+    r3d.drawWalls(gs, backbuffer);
     r3d.drawSprites(gs, backbuffer);
 
     let gunAspect = 201/80;

@@ -67,9 +67,10 @@ export class Backbuffer {
     }
 
     drawTexture(texture: Texture,
-        srcX: number, srcY: number, srcW: number, srcH: number,
-        desX: number, desY: number, desW: number, desH: number,
-                vertical?: boolean, fogColor?: number, fogT?: number) {
+                srcX: number, srcY: number, srcW: number, srcH: number,
+                desX: number, desY: number, desW: number, desH: number,
+                vertical?: boolean, fogColor?: number, fogT?: number,
+                lightAmount?: number, lightColor?: number) {
 
         let minX = desX;
         let maxX = minX + (desW - 1);
@@ -128,7 +129,7 @@ export class Backbuffer {
                     const sr = ((srcColor >> 16) & 0xff);
                     const sg = ((srcColor >> 8) & 0xff);
                     const sb = ((srcColor >> 0) & 0xff);
-
+                    
                     const r = Math.floor(sr * (1-fogT) + dr * fogT);
                     const g = Math.floor(sg * (1-fogT) + dg * fogT);
                     const b = Math.floor(sb * (1-fogT) + db * fogT);
@@ -136,6 +137,23 @@ export class Backbuffer {
                     srcColor = (0xff << 24) | (r << 16) | (g << 8) | (b);
                 }
 
+                if (lightColor !== undefined && lightAmount !== undefined) {
+                    const lr = ((lightColor >> 16) & 0xff) / 256;
+                    const lg = ((lightColor >> 8) & 0xff) / 256;
+                    const lb = ((lightColor >> 0) & 0xff) / 256;
+
+                    const sr = ((srcColor >> 16) & 0xff);
+                    const sg = ((srcColor >> 8) & 0xff);
+                    const sb = ((srcColor >> 0) & 0xff);
+                    
+                    const r = Math.floor(sr * lightAmount * lr);
+                    const g = Math.floor(sg * lightAmount * lg);
+                    const b = Math.floor(sb * lightAmount * lb);
+
+                    srcColor = (0xff << 24) | (r << 16) | (g << 8) | (b);
+                }
+
+                
                 this.buffer[desOffsetY * this.width + desOffsetX] = srcColor;
             }
         }
