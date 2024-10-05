@@ -199,7 +199,11 @@ export function update(gs: GameState, input: Input, dt: number) {
     });
 
     gs.lights.forEach(light => {
-        DebugMinimap.getInstance().drawCircle(light.pos, light.strength / 5, "yellow");
+        const r = ((light.color >> 16) & 0xff);
+        const g = ((light.color >> 8) & 0xff);
+        const b = ((light.color >> 0) & 0xff);
+        const colorStr = `rgba(${b},${g},${r}, 0.3)`;
+        DebugMinimap.getInstance().drawCircle(light.pos, light.strength / 2, colorStr);
     })
 
 }
