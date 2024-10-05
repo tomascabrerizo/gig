@@ -217,7 +217,8 @@ export function draw(gs: GameState, r3d: Render3d, backbuffer: Backbuffer) {
     const screenGunW = Math.floor(screenGunH * gunAspect);
     const screenGunX = Math.floor(backbuffer.width/2 - screenGunW/2);
     const screenGunY = Math.floor(backbuffer.height - screenGunH);
-    backbuffer.drawTexture(gunTexture, 0, 0, gunTexture.width, gunTexture.height, screenGunX, screenGunY, screenGunW, screenGunH);
+    const lightColor = r3d.calculateLights(gs, gs.playerPos);
+    backbuffer.drawTexture(gunTexture, 0, 0, gunTexture.width, gunTexture.height, screenGunX, screenGunY, screenGunW, screenGunH, false, lightColor);
 
     backbuffer.draw();    
 }
