@@ -59,6 +59,7 @@ type Hit = {
     t: number,
     texture: AssetHandle,
     isVertical: boolean,
+    normal: Vector2,
 };
 
 export class Render3d {
@@ -124,12 +125,18 @@ export class Render3d {
             }
 
             if (mapY < 0 || mapY >= gs.map.getHeight() || mapX < 0 || mapX >= gs.map.getWidth()) {
-                return { result: false, t: 0, texture: gs.map.getTexture(0), isVertical: false };
+                return { result: false, t: 0, texture: gs.map.getTexture(0), isVertical: false, normal: new Vector2(0, 0) };
             }
 
             const mapIndex = gs.map.tiles[mapY][mapX];
             if (mapIndex !== undefined && mapIndex !== 0) {
-                return { result: true, t, texture: gs.map.getTexture(mapIndex - 1), isVertical };
+                let normal: Vector2;
+                if(!isVertical) {
+                    normal = (dx > 0) ? new Vector2(-1, 0) : new Vector2(1, 0);
+                } else {
+                    normal = (dy > 0) ? new Vector2(0, -1) : new Vector2(0, 1);
+                }
+                return { result: true, t, texture: gs.map.getTexture(mapIndex - 1), isVertical, normal };
             }
         }
     }
@@ -141,47 +148,42 @@ export class Render3d {
         return planeDir;
     }
 
-    calculateFog(gs: GameState, distance: number): { color: number, t: number } {
-        const fogColor = 0xff88bb88;
-        const t = Math.max(Math.min(distance / gs.cameraFar, 1), 0);
-        const fogT = Math.min(t * t * (3 - 2 * t), 0.7);
-        return {
-            color: fogColor,
-            t: fogT,
-        };
+    easeOutExpo(x: number): number {
+        return x === 1 ? 1 : 1 - Math.pow(2, -10 * x);
     }
 
-    calculateLights(gs: GameState, worldPos:Vector2) {
-        let finalAmount: number = 0;
-        let finalColor: number = gs.ambient;
+    calculateLights(gs: GameState, worldPos:Vector2, normal?:Vector2): number {
 
+
+        // Try premultiplied alpha        
+        let r = Math.floor(((gs.ambient >> 16) & 0xff) * gs.ambientAmount);
+        let g = Math.floor(((gs.ambient >> 8) & 0xff) * gs.ambientAmount);
+        let b = Math.floor(((gs.ambient >> 0) & 0xff) * gs.ambientAmount);
+        
+        
         gs.lights.forEach(light => {
-            const distance: number = worldPos.sub(light.pos).length();
-            const lightAmount = light.strength / (distance * distance);
-            finalAmount += lightAmount;
-
-            const sr = ((finalColor >> 16) & 0xff);
-            const sg = ((finalColor >> 8) & 0xff);
-            const sb = ((finalColor >> 0) & 0xff);            
+            const distance: number =  worldPos.sub(light.pos).length();
             
-            const dr = ((light.color >> 16) & 0xff);
-            const dg = ((light.color >> 8) & 0xff);
-            const db = ((light.color >> 0) & 0xff);
+            let dotStrength = 1;
+            if(normal !== undefined) {
+                dotStrength = Math.max(Math.min(light.pos.sub(worldPos).dot(normal), 1), 0);
+            }
 
-            const t = Math.min(Math.max(lightAmount, 0), 1)
-            const r = Math.floor(sr * (1 - t) + dr * t);
-            const g = Math.floor(sg * (1 - t) + dg * t);
-            const b = Math.floor(sb * (1 - t) + db * t);
-
-            finalColor = (0xff << 24) | (r << 16) | (g << 8) | (b);
-
+            const lightAmount = Math.min((light.strength / (distance * distance)) * dotStrength, 1);
+            
+            r += Math.floor(((light.color >> 16) & 0xff) * lightAmount);
+            g += Math.floor(((light.color >> 8) & 0xff) * lightAmount);
+            b += Math.floor(((light.color >> 0) & 0xff) * lightAmount);
+            
         });
 
+        r = Math.max(Math.min(r, 255), 0);
+        g = Math.max(Math.min(g, 255), 0);
+        b = Math.max(Math.min(b, 255), 0);
         
-        return {
-            color: finalColor,
-            t:  Math.min(Math.max(finalAmount, 0), 1),
-        }
+        const finalColor = (0xff << 24) | (r << 16) | (g << 8) | (b);
+        return finalColor;
+        
     }
     
     drawFloor(gs: GameState, backbuffer: Backbuffer) {
@@ -208,56 +210,43 @@ export class Render3d {
                 const tx: number = Math.floor((floor.x - Math.floor(floor.x)) * floorTexture.width);
                 const ty: number = Math.floor((floor.y - Math.floor(floor.y)) * floorTexture.height);
 
-                const fog = this.calculateFog(gs, distance);
-                const light = this.calculateLights(gs, floor);
+                const lightColor = this.calculateLights(gs, floor);
 
                 {
-                    const fogT = fog.t;
-                    const fogColor = fog.color;
                     const srcColor: number = floorTexture.pixels[ty * floorTexture.width + tx];
-
-                    const dr = ((fogColor >> 16) & 0xff);
-                    const dg = ((fogColor >> 8) & 0xff);
-                    const db = ((fogColor >> 0) & 0xff);
 
                     const sr = ((srcColor >> 16) & 0xff);
                     const sg = ((srcColor >> 8) & 0xff);
                     const sb = ((srcColor >> 0) & 0xff);
 
-                    const lr = ((light.color >> 16) & 0xff) / 256;
-                    const lg = ((light.color >> 8) & 0xff) / 256;
-                    const lb = ((light.color >> 0) & 0xff) / 256;
+                    const lr = ((lightColor >> 16) & 0xff) / 256;
+                    const lg = ((lightColor >> 8) & 0xff) / 256;
+                    const lb = ((lightColor >> 0) & 0xff) / 256;
                     
-                    const r = Math.floor((sr * (1 - fogT) + dr * fogT) * light.t*lr);
-                    const g = Math.floor((sg * (1 - fogT) + dg * fogT) * light.t*lg);
-                    const b = Math.floor((sb * (1 - fogT) + db * fogT) * light.t*lb);
+                    let r = Math.floor(sr * lr);
+                    let g = Math.floor(sg * lg);
+                    let b = Math.floor(sb * lb);
                     
                     let color = (0xff << 24) | (r << 16) | (g << 8) | (b);
-
+                   
                     backbuffer.buffer[y * backbuffer.width + x] = color;
                 }
 
                 {
-                    const fogT = fog.t;
-                    const fogColor = fog.color;
-                    const srcColor: number = ceilTexture.pixels[ty * ceilTexture.width + tx];
-
-                    const dr = ((fogColor >> 16) & 0xff);
-                    const dg = ((fogColor >> 8) & 0xff);
-                    const db = ((fogColor >> 0) & 0xff);
+                    const srcColor: number = ceilTexture.pixels[ty * ceilTexture.width + tx];                    
 
                     const sr = ((srcColor >> 16) & 0xff);
                     const sg = ((srcColor >> 8) & 0xff);
                     const sb = ((srcColor >> 0) & 0xff);
 
-                    const lr = ((light.color >> 16) & 0xff) / 256;
-                    const lg = ((light.color >> 8) & 0xff) / 256;
-                    const lb = ((light.color >> 0) & 0xff) / 256;
+                    const lr = ((lightColor >> 16) & 0xff) / 256;
+                    const lg = ((lightColor >> 8) & 0xff) / 256;
+                    const lb = ((lightColor >> 0) & 0xff) / 256;
                     
-                    const r = Math.floor((sr * (1 - fogT) + dr * fogT) * light.t*lr);
-                    const g = Math.floor((sg * (1 - fogT) + dg * fogT) * light.t*lg);
-                    const b = Math.floor((sb * (1 - fogT) + db * fogT) * light.t*lb);
-                                        
+                    let r = Math.floor(sr * lr);
+                    let g = Math.floor(sg * lg);
+                    let b = Math.floor(sb * lb);
+                    
                     let color = (0xff << 24) | (r << 16) | (g << 8) | (b);
 
                     const ceilingY: number = (backbuffer.height - y - 1);
@@ -318,10 +307,9 @@ export class Render3d {
                 const srcW = 1;
                 const srcH = spriteTexture.height;
 
-                const fog = this.calculateFog(gs, z);
-                const light = this.calculateLights(gs, spritePos);
+                const lightColor = this.calculateLights(gs, spritePos);
 
-                backbuffer.drawTexture(spriteTexture, srcX, srcY, srcW, srcH, index, y, 1, spriteDim, false, fog.color, fog.t, light.t, light.color);
+                backbuffer.drawTexture(spriteTexture, srcX, srcY, srcW, srcH, index, y, 1, spriteDim, false, lightColor);
             }
 
         }
@@ -359,7 +347,7 @@ export class Render3d {
                 const hitPos: Vector2 = gs.playerPos.add(hitDir);
                 const z = hitDir.dot(gs.playerDir.norm());
 
-                const light = this.calculateLights(gs, hitPos);
+                const lightColor = this.calculateLights(gs, hitPos, hit.normal);
                 
                 backbuffer.zBuffer[index] = z;
 
@@ -378,8 +366,7 @@ export class Render3d {
                 const srcY = 0;
                 const srcW = 1;
                 const srcH = texture.height;
-                const fog = this.calculateFog(gs, z);
-                backbuffer.drawTexture(texture, srcX, srcY, srcW, srcH, index, y, 1, height, hit.isVertical, fog.color, fog.t, light.t, light.color);
+                backbuffer.drawTexture(texture, srcX, srcY, srcW, srcH, index, y, 1, height, hit.isVertical, lightColor);
             }
         }
     }

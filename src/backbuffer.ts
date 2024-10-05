@@ -69,8 +69,7 @@ export class Backbuffer {
     drawTexture(texture: Texture,
                 srcX: number, srcY: number, srcW: number, srcH: number,
                 desX: number, desY: number, desW: number, desH: number,
-                vertical?: boolean, fogColor?: number, fogT?: number,
-                lightAmount?: number, lightColor?: number) {
+                vertical?: boolean, lightColor?: number) {
 
         let minX = desX;
         let maxX = minX + (desW - 1);
@@ -113,31 +112,15 @@ export class Backbuffer {
                 const a = ((srcColor >> 24) & 0xff);
                 if(a < Math.floor(0xff/2)) continue;
                 
-                if (vertical === true) {
-                    const scale = 0.4;
-                    const r = ((srcColor >> 16) & 0xff) * scale;
-                    const g = ((srcColor >> 8) & 0xff) * scale;
-                    const b = ((srcColor >> 0) & 0xff) * scale;
-                    srcColor = (0xff << 24) | (r << 16) | (g << 8) | (b);
-                }
+                // if (vertical === true) {
+                //     const scale = 0.4;
+                //     const r = ((srcColor >> 16) & 0xff) * scale;
+                //     const g = ((srcColor >> 8) & 0xff) * scale;
+                //     const b = ((srcColor >> 0) & 0xff) * scale;
+                //     srcColor = (0xff << 24) | (r << 16) | (g << 8) | (b);
+                // }
 
-                if(fogColor && fogT) {
-                    const dr = ((fogColor >> 16) & 0xff);
-                    const dg = ((fogColor >> 8) & 0xff);
-                    const db = ((fogColor >> 0) & 0xff);
-
-                    const sr = ((srcColor >> 16) & 0xff);
-                    const sg = ((srcColor >> 8) & 0xff);
-                    const sb = ((srcColor >> 0) & 0xff);
-                    
-                    const r = Math.floor(sr * (1-fogT) + dr * fogT);
-                    const g = Math.floor(sg * (1-fogT) + dg * fogT);
-                    const b = Math.floor(sb * (1-fogT) + db * fogT);
-                    
-                    srcColor = (0xff << 24) | (r << 16) | (g << 8) | (b);
-                }
-
-                if (lightColor !== undefined && lightAmount !== undefined) {
+                if (lightColor !== undefined) {
                     const lr = ((lightColor >> 16) & 0xff) / 256;
                     const lg = ((lightColor >> 8) & 0xff) / 256;
                     const lb = ((lightColor >> 0) & 0xff) / 256;
@@ -146,13 +129,12 @@ export class Backbuffer {
                     const sg = ((srcColor >> 8) & 0xff);
                     const sb = ((srcColor >> 0) & 0xff);
                     
-                    const r = Math.floor(sr * lightAmount * lr);
-                    const g = Math.floor(sg * lightAmount * lg);
-                    const b = Math.floor(sb * lightAmount * lb);
+                    const r = Math.floor(sr * lr);
+                    const g = Math.floor(sg * lg);
+                    const b = Math.floor(sb * lb);
 
                     srcColor = (0xff << 24) | (r << 16) | (g << 8) | (b);
-                }
-
+                }                
                 
                 this.buffer[desOffsetY * this.width + desOffsetX] = srcColor;
             }

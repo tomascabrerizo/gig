@@ -26,6 +26,7 @@ export type GameState = {
 
     lights: Light[];
     ambient: number;
+    ambientAmount: number;
 }
 
 export function init(): GameState {
@@ -41,7 +42,7 @@ export function init(): GameState {
 
         cameraFOV: 90,
         cameraNear: 1,
-        cameraFar: 7,
+        cameraFar: 10,
 
         sprites: [
             createCoin(new Vector2(1.5, 1.5)),
@@ -73,12 +74,12 @@ export function init(): GameState {
         lights: [
             {
                 pos: new Vector2(map.getWidth() / 2, map.getHeight() / 2),
-                strength: 6,
-                color: 0x00ffff,
+                strength: 4,
+                color: 0xffffff,
             },
             {
-                pos: new Vector2(0, 0),
-                strength: 2,
+                pos: new Vector2(4, 2),
+                strength: 6,
                 color: 0xff0000,
             },
             {
@@ -87,18 +88,19 @@ export function init(): GameState {
                 color: 0x00ff00,
             },
             {
-                pos: new Vector2(2, map.getHeight()-2),
+                pos: new Vector2(1.5, map.getHeight()-1.5),
                 strength: 2,
                 color: 0x0000ff,
             },
             {
-                pos: new Vector2(map.getWidth()-2, map.getHeight()-2),
-                strength: 2,
-                color: 0xff00ff,
+                pos: new Vector2(map.getWidth() - 3, map.getHeight() - 3),
+                strength: 4,
+                color: 0x0088ff,
             }
 
         ],
         ambient: 0xffffff,
+        ambientAmount: 0.2,
     };
     
 }
@@ -184,7 +186,6 @@ export function update(gs: GameState, input: Input, dt: number) {
     }
 
     gs.playerPos = newPlayerPos;
-    // gs.lights[0].pos = newPlayerPos;
     
     DebugMinimap.getInstance().drawCircle(gs.playerPos, gs.playerRad, "yellow");
     DebugMinimap.getInstance().drawLine(gs.playerPos, gs.playerPos.add(gs.playerDir), 0.1, "red");
@@ -194,7 +195,13 @@ export function update(gs: GameState, input: Input, dt: number) {
         const timePerImage = sprite.speed / 5;
         sprite.index = Math.floor(sprite.currentTime / timePerImage) % sprite.textures.length;
         sprite.currentTime += dt;
+        
     });
+
+    gs.lights.forEach(light => {
+        DebugMinimap.getInstance().drawCircle(light.pos, light.strength / 5, "yellow");
+    })
+
 }
 
 export function draw(gs: GameState, r3d: Render3d, backbuffer: Backbuffer) {
@@ -212,5 +219,5 @@ export function draw(gs: GameState, r3d: Render3d, backbuffer: Backbuffer) {
     const screenGunY = Math.floor(backbuffer.height - screenGunH);
     backbuffer.drawTexture(gunTexture, 0, 0, gunTexture.width, gunTexture.height, screenGunX, screenGunY, screenGunW, screenGunH);
 
-    backbuffer.draw();
+    backbuffer.draw();    
 }
